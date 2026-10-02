@@ -1,10 +1,10 @@
-// app/api/upload/route.ts – อัปโหลดรูปภาพไปยัง Cloudflare R2
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getTeacherSession } from "@/lib/auth-edge";
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getTeacherSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await req.formData();
@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
 
   try {
-    // ใช้ Cloudflare R2 binding (production) หรือ base64 data URL (dev)
     const env = (req as NextRequest & { env?: { R2?: unknown } }).env;
     const R2 = (env as { R2?: { put: (k: string, v: ArrayBuffer, opts: object) => Promise<void> } } | undefined)?.R2;
 
@@ -34,9 +33,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ url: publicUrl, key });
     }
 
-    // Dev fallback: base64 data URL
     const buffer = await file.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
     const dataUrl = `data:${file.type};base64,${base64}`;
     return NextResponse.json({ url: dataUrl, key: "local" });
   } catch (err) {

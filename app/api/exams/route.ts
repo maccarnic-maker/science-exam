@@ -1,7 +1,7 @@
-// app/api/exams/route.ts – CRUD สำหรับชุดข้อสอบ
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getTeacherSession } from "@/lib/auth-edge";
 import { generateId, generateToken } from "@/lib/utils";
 
 function getDB(req: NextRequest) {
@@ -11,7 +11,7 @@ function getDB(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getTeacherSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getDB(req);
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getTeacherSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getDB(req);
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   await db
     .prepare("INSERT INTO exams (id, teacher_id, title, description, subject, time_limit, token) VALUES (?,?,?,?,?,?,?)")
-    .bind(examId, session.user?.email ?? "unknown", title, description ?? "", subject ?? "วิทยาศาสตร์", time_limit ?? 60, token)
+    .bind(examId, session.email, title, description ?? "", subject ?? "วิทยาศาสตร์", time_limit ?? 60, token)
     .run();
 
   for (const cls of classrooms) {
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getTeacherSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getDB(req);
@@ -75,7 +75,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getTeacherSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getDB(req);

@@ -1,8 +1,8 @@
-// app/api/results/route.ts – บันทึกและดึงผลสอบ
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
 import { generateId } from "@/lib/utils";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getTeacherSession } from "@/lib/auth-edge";
 
 type DB = {
   prepare: (q: string) => {
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
 
 // GET /api/results?exam_id=xxx – ครูดูผลสอบ
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getTeacherSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getDB(req);

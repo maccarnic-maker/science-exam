@@ -1,12 +1,14 @@
 "use client";
-import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { Suspense } from "react";
 
 function LoginContent() {
   const params = useSearchParams();
   const error = params.get("error");
+
+  const handleGoogleLogin = () => {
+    window.location.href = "/api/auth/google";
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700 p-4">
@@ -44,7 +46,7 @@ function LoginContent() {
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm text-center">
             {error === "unauthorized"
               ? "❌ อีเมลนี้ไม่มีสิทธิ์เข้าใช้งาน กรุณาใช้อีเมลของครู"
-              : "⚠️ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง"}
+              : "⚠️ เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"}
           </div>
         )}
 
@@ -54,7 +56,7 @@ function LoginContent() {
 
         {/* Google Login Button */}
         <button
-          onClick={() => signIn("google", { callbackUrl: "/teacher/dashboard" })}
+          onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 
                      border-2 border-slate-200 hover:border-blue-300 text-slate-700 font-semibold 
                      px-6 py-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg group"

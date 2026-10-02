@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 // app/api/classrooms/route.ts
 import { NextRequest, NextResponse } from "next/server";
 

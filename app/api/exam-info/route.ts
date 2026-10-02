@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 // app/api/exam-info/route.ts – Public API สำหรับนักเรียนดึงข้อมูลข้อสอบ
 import { NextRequest, NextResponse } from "next/server";
 

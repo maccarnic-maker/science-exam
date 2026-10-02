@@ -1,4 +1,5 @@
 "use client";
+export const runtime = 'edge';
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusCircle, Trash2, BookOpen } from "lucide-react";

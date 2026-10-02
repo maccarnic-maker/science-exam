@@ -1,4 +1,5 @@
 "use client";
+export const runtime = 'edge';
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users } from "lucide-react";

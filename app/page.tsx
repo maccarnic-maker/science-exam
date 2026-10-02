@@ -1,10 +1,10 @@
-// app/page.tsx – Landing page redirect
+export const runtime = 'edge';
+
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getTeacherSession } from "@/lib/auth-edge";
 
 export default async function Home() {
-  const session = await getServerSession(authOptions);
+  const session = await getTeacherSession();
   if (session) {
     redirect("/teacher/dashboard");
   } else {

@@ -1,4 +1,5 @@
 "use client";
+export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FlaskConical, Clock, BookOpen, User, Hash } from "lucide-react";

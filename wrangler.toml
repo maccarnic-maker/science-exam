@@ -12,5 +12,3 @@ database_id = "9bafff18-833f-40cc-81fe-4490d42052ba"
 binding = "R2"
 bucket_name = "science-exam-files"
 
-[vars]
-NEXTAUTH_URL = "https://science-exam.bankruaschool.ac.th"

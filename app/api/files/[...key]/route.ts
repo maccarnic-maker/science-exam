@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 // app/api/files/[...key]/route.ts – Proxy ไฟล์จาก R2 ออกมาสู่ browser
 import { NextRequest, NextResponse } from "next/server";
 

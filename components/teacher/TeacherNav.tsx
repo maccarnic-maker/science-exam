@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { BookOpen, LayoutDashboard, LogOut, FlaskConical } from "lucide-react";
 import Image from "next/image";
 
@@ -16,6 +15,10 @@ export default function TeacherNav({ user }: Props) {
     { href: "/teacher/dashboard", label: "แดชบอร์ด", icon: LayoutDashboard },
     { href: "/teacher/exams", label: "ชุดข้อสอบ", icon: BookOpen },
   ];
+
+  const handleSignOut = () => {
+    window.location.href = "/api/auth/google?action=signout";
+  };
 
   return (
     <nav className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
@@ -59,7 +62,7 @@ export default function TeacherNav({ user }: Props) {
             <p className="text-xs text-slate-400">{user?.email}</p>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={handleSignOut}
             className="flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors ml-2"
             title="ออกจากระบบ"
           >
