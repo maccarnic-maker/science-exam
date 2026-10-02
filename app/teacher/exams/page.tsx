@@ -23,8 +23,18 @@ export default function ExamsListPage() {
   const load = () => {
     fetch("/api/exams")
       .then((r) => r.json())
-      .then((d) => { setExams(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((d) => {
+        if (Array.isArray(d)) {
+          setExams(d);
+        } else {
+          setExams([]);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setExams([]);
+        setLoading(false);
+      });
   };
 
   useEffect(load, []);

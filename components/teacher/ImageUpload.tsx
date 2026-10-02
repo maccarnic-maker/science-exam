@@ -26,7 +26,7 @@ export default function ImageUpload({ value, onChange, label = "เพิ่ม�
     setUploading(false);
 
     if (res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as any;
       onChange(data.url);
     }
     e.target.value = "";

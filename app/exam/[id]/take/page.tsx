@@ -36,7 +36,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         fetch(`/api/questions/public?exam_id=${params.id}`),
       ]);
       if (!eRes.ok || !qRes.ok) { toast.error("ไม่พบข้อสอบ"); return; }
-      const exam = await eRes.json();
+      const exam = (await eRes.json()) as any;
       const qs: Question[] = await qRes.json();
       timeLimitRef.current = exam.time_limit;
       setTimeLeft(exam.time_limit * 60);
@@ -79,7 +79,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     });
 
     if (res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as any;
       setScoreResult(data);
       setSubmitted(true);
       sessionStorage.removeItem("student_info");

@@ -39,11 +39,11 @@ export default function NewExamPage() {
     setLoading(false);
 
     if (res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as any;
       toast.success("สร้างชุดข้อสอบสำเร็จ!");
       router.push(`/teacher/exams/${data.id}`);
     } else {
-      const err = await res.json();
+      const err = (await res.json()) as any;
       toast.error(err.error ?? "เกิดข้อผิดพลาด");
     }
   };

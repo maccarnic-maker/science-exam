@@ -2,6 +2,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getTeacherSession } from "@/lib/auth-edge";
+import { getR2 } from "@/lib/cloudflare";
 
 export async function POST(req: NextRequest) {
   const session = await getTeacherSession(req);
@@ -19,8 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
 
   try {
-    const env = (req as NextRequest & { env?: { R2?: unknown } }).env;
-    const R2 = (env as { R2?: { put: (k: string, v: ArrayBuffer, opts: object) => Promise<void> } } | undefined)?.R2;
+    const R2 = getR2(req);
 
     const ext = file.name.split(".").pop() ?? "jpg";
     const key = `questions/${crypto.randomUUID()}.${ext}`;
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
     const base64 = btoa(binary);
     const dataUrl = `data:${file.type};base64,${base64}`;
     return NextResponse.json({ url: dataUrl, key: "local" });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
