@@ -1,6 +1,6 @@
 "use client";
 export const runtime = 'edge';
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users } from "lucide-react";
 import Link from "next/link";
@@ -18,7 +18,7 @@ interface Result { id: string; student_name: string; student_number: string; cla
 const TABS = ["ข้อสอบ", "ผลสอบ"] as const;
 const LABELS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
 
-export default function ExamDetailPage({ params }: { params: { id: string } }) {
+function ExamDetailContent({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
   const [exam, setExam] = useState<Exam | null>(null);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -260,5 +260,13 @@ export default function ExamDetailPage({ params }: { params: { id: string } }) {
         />
       )}
     </div>
+  );
+}
+
+export default function ExamDetailPageWrapper({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400">กำลังโหลด...</div>}>
+      <ExamDetailContent params={params} />
+    </Suspense>
   );
 }

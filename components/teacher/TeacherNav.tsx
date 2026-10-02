@@ -27,6 +27,7 @@ export default function TeacherNav({ user }: Props) {
         <Link href="/teacher/dashboard" className="flex items-center gap-2 font-bold text-blue-700 text-lg">
           <FlaskConical className="w-7 h-7 text-blue-600" />
           <span>Science Exam</span>
+          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">v1.0.2</span>
         </Link>
 
         {/* Nav links */}
@@ -48,14 +49,18 @@ export default function TeacherNav({ user }: Props) {
 
         {/* User + Logout */}
         <div className="flex items-center gap-3">
-          {user?.image && (
-            <Image
+          {user?.image ? (
+            <img
               src={user.image}
               alt={user.name ?? ""}
               width={36}
               height={36}
-              className="rounded-full ring-2 ring-blue-200"
+              className="rounded-full ring-2 ring-blue-200 object-cover"
             />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+              {user?.name ? user.name[0] : "T"}
+            </div>
           )}
           <div className="hidden sm:block text-right">
             <p className="text-sm font-semibold text-slate-800">{user?.name}</p>
