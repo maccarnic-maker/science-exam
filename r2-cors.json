@@ -1,0 +1,10 @@
+{
+  "rules": [
+    {
+      "allowedOrigins": ["https://science-exam.bankruaschool.ac.th", "http://localhost:3000"],
+      "allowedMethods": ["GET", "PUT", "POST", "DELETE"],
+      "allowedHeaders": ["*"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

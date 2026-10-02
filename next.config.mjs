@@ -1,15 +1,14 @@
-
-
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "*.r2.cloudflarestorage.com",
+        hostname: "science-exam.bankruaschool.ac.th",
       },
       {
-        protocol: "https",
-        hostname: "pub-*.r2.dev",
+        protocol: "http",
+        hostname: "localhost",
       },
     ],
   },

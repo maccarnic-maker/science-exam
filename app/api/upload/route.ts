@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
     if (R2) {
       const buffer = await file.arrayBuffer();
       await R2.put(key, buffer, { httpMetadata: { contentType: file.type } });
-      const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
+      const origin = req.headers.get("origin") ?? process.env.NEXTAUTH_URL ?? "";
+      const publicUrl = `${origin}/api/files/${key}`;
       return NextResponse.json({ url: publicUrl, key });
     }
 

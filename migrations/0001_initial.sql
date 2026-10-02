@@ -1,6 +1,3 @@
-# Cloudflare D1 – Science Exam Schema
--- Migration: 0001_initial.sql
-
 CREATE TABLE IF NOT EXISTS teachers (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,

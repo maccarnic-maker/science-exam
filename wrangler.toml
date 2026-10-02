@@ -6,7 +6,7 @@ pages_build_output_dir = ".vercel/output/static"
 [[d1_databases]]
 binding = "DB"
 database_name = "science-exam-db"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "9bafff18-833f-40cc-81fe-4490d42052ba"
 
 [[r2_buckets]]
 binding = "R2"
