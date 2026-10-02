@@ -1,0 +1,16 @@
+name = "science-exam"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "science-exam-db"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "science-exam-files"
+
+[vars]
+NEXTAUTH_URL = "https://science-exam.bankruaschool.ac.th"
