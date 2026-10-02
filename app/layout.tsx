@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
-import SessionProvider from "@/components/providers/SessionProvider";
 
 export const metadata: Metadata = {
   title: "ระบบสอบวิทยาศาสตร์ | โรงเรียนบ้านกรวย",
@@ -23,21 +22,19 @@ export default function RootLayout({
         />
       </head>
       <body style={{ fontFamily: "'Sarabun', sans-serif" }}>
-        <SessionProvider>
-          {children}
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                fontFamily: "'Sarabun', sans-serif",
-                fontSize: "14px",
-                borderRadius: "12px",
-              },
-              success: { iconTheme: { primary: "#16a34a", secondary: "#fff" } },
-              error: { iconTheme: { primary: "#dc2626", secondary: "#fff" } },
-            }}
-          />
-        </SessionProvider>
+        {children}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              fontFamily: "'Sarabun', sans-serif",
+              fontSize: "14px",
+              borderRadius: "12px",
+            },
+            success: { iconTheme: { primary: "#16a34a", secondary: "#fff" } },
+            error: { iconTheme: { primary: "#dc2626", secondary: "#fff" } },
+          }}
+        />
       </body>
     </html>
   );
