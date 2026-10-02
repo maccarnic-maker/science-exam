@@ -9,7 +9,7 @@ import QRModal from "@/components/teacher/QRModal";
 import Image from "next/image";
 
 interface Choice { id: string; choice_text: string; choice_image?: string; is_correct: number; order_num: number }
-interface Question { id: string; question_text: string; question_image?: string; points: number; order_num: number; choices: Choice[] }
+interface Question { id: string; question_text: string; question_image?: string; question_type: string; points: number; order_num: number; choices: Choice[] }
 interface Classroom { id: string; name: string; grade: string }
 interface Exam { id: string; title: string; subject: string; time_limit: number; is_active: number; token: string; description: string }
 interface Result { id: string; student_name: string; student_number: string; classroom_name: string; score: number; total_points: number; submitted_at: number }
@@ -134,6 +134,7 @@ export default function ExamDetailPage({ params }: { params: { id: string } }) {
               examId={id}
               question={editQ ? {
                 ...editQ,
+                question_type: editQ.question_type ?? "multiple_choice",
                 choices: editQ.choices.map((c) => ({
                   id: c.id, text: c.choice_text, image: c.choice_image,
                   is_correct: c.is_correct === 1, order_num: c.order_num,

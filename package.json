@@ -43,5 +43,16 @@
     "drizzle-kit": "^0.31.1",
     "wrangler": "^4.24.3",
     "@cloudflare/workers-types": "^4.20250525.0"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true,
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.15.18": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.28.1": true,
+    "unrs-resolver@1.12.2": true,
+    "workerd@1.20250718.0": true,
+    "workerd@1.20261001.1": true
   }
 }

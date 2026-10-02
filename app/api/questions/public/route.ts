@@ -29,14 +29,14 @@ export async function GET(req: NextRequest) {
   const questions = await db
     .prepare("SELECT id, question_text, question_image, question_type, points, order_num FROM questions WHERE exam_id = ? ORDER BY order_num")
     .bind(examId)
-    .all<{ id: string; question_text: string; question_image: string | null; points: number; order_num: number }>();
+    .all();
 
   const result = await Promise.all(
     ((questions.results ?? []) as { id: string }[]).map(async (q) => {
       const choices = await db
         .prepare("SELECT id, choice_text, choice_image, order_num FROM choices WHERE question_id = ? ORDER BY order_num")
         .bind(q.id)
-        .all<{ id: string; choice_text: string; choice_image: string | null; order_num: number }>();
+        .all();
       return { ...q, choices: choices.results ?? [] };
     })
   );
