@@ -215,6 +215,14 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   if (loading) return <div className="card text-center py-16 text-slate-400">กำลังโหลด...</div>;
   if (!exam) return <div className="card text-center py-16 text-slate-400">ไม่พบชุดข้อสอบ</div>;
 
+  const answerChoiceCount = Math.max(1, ...questions.map((question) => question.choices.length));
+  const answerChoiceLabels = LABELS.slice(0, answerChoiceCount);
+  const answerSheetGridStyle = { gridTemplateColumns: `10mm repeat(${answerChoiceCount}, minmax(0, 1fr))` };
+  const answerGroups = Array.from(
+    { length: Math.ceil(questions.length / 10) },
+    (_, groupIndex) => questions.slice(groupIndex * 10, groupIndex * 10 + 10),
+  );
+
   return (
     <>
     <div className="exam-page-content animate-fade-in">
@@ -580,39 +588,66 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
         </section>
 
         <section className="offline-exam-print-answers">
-          <header className="offline-exam-print-header">
-            <h1>โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์)</h1>
-            <p>กระดาษคำตอบวิชา {exam.subject}</p>
-            <h2>{exam.title}</h2>
-            <p className="offline-exam-print-meta">
-              จำนวน {questions.length} ข้อ · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน
-            </p>
-          </header>
-
-          <div className="offline-exam-print-student-fields">
-            <span>ชื่อ - นามสกุล __________________________________________</span>
-            <span>เลขที่ __________</span>
-            <span>ห้อง __________</span>
-          </div>
-
-          <div className="offline-exam-print-instructions">
-            <strong>คำชี้แจง</strong> ให้นักเรียนทำเครื่องหมาย ✓ หรือ ✕ ลงในช่องคำตอบที่เลือกเพียงช่องเดียวต่อข้อ
-          </div>
-
-          <div className="offline-exam-print-answer-grid">
-            {questions.map((question, questionIndex) => (
-              <div className="offline-exam-print-answer-item" key={question.id}>
-                <span className="offline-exam-print-answer-number">{questionIndex + 1}.</span>
-                {question.choices.map((choice, choiceIndex) => (
-                  <span className="offline-exam-print-answer-choice" key={choice.id}>
-                    □ {LABELS[choiceIndex] ?? choiceIndex + 1}
-                  </span>
-                ))}
+          <div className="offline-answer-sheet">
+            <header className="offline-answer-sheet-header">
+              <div>
+                <h1>กระดาษคำตอบ</h1>
+                <p>วิชา {exam.subject} · {exam.title}</p>
+                <p className="offline-answer-sheet-meta">จำนวน {questions.length} ข้อ · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน</p>
               </div>
-            ))}
-          </div>
+              <img src="/school-logo-qr.png" alt="ตราโรงเรียนบ้านครัว" className="offline-answer-sheet-logo" />
+            </header>
 
-          <footer className="offline-exam-print-footer">กระดาษคำตอบ</footer>
+            <div className="offline-answer-sheet-instruction">
+              <strong>คำชี้แจง</strong> ให้นักเรียนระบายคำตอบด้วยดินสอหรือปากกา ลงบนวงกลมคำตอบที่ถูกต้องเพียงคำตอบเดียว
+            </div>
+
+            <div className="offline-answer-sheet-fields">
+              <div className="offline-answer-sheet-field offline-answer-sheet-field-wide">
+                <span>ชื่อ-สกุล</span><i />
+              </div>
+              <div className="offline-answer-sheet-field">
+                <span>ชั้น</span><i />
+              </div>
+              <div className="offline-answer-sheet-field">
+                <span>เลขที่</span><i />
+              </div>
+              <div className="offline-answer-sheet-field">
+                <span>วันที่</span><i />
+              </div>
+              <div className="offline-answer-sheet-field">
+                <span>วิชา</span><i />
+              </div>
+            </div>
+
+            <div className="offline-answer-sheet-columns">
+              {answerGroups.map((group, groupIndex) => (
+                <section className="offline-answer-sheet-column" key={`answer-group-${groupIndex}`}>
+                  <div className="offline-answer-sheet-column-header" style={answerSheetGridStyle}>
+                    <span>ข้อ</span>
+                    {answerChoiceLabels.map((label) => <span key={label}>{label}</span>)}
+                  </div>
+                  {group.map((question, questionIndex) => {
+                    const number = groupIndex * 10 + questionIndex + 1;
+                    return (
+                      <div className="offline-answer-sheet-row" key={question.id} style={answerSheetGridStyle}>
+                        <span className="offline-answer-sheet-number">{number}</span>
+                        {answerChoiceLabels.map((label, choiceIndex) => (
+                          <span
+                            className={question.choices[choiceIndex] ? "offline-answer-sheet-bubble" : "offline-answer-sheet-bubble offline-answer-sheet-bubble-empty"}
+                            key={`${question.id}-${label}`}
+                            aria-label={`${number} ${label}`}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })}
+                </section>
+              ))}
+            </div>
+
+            <footer className="offline-answer-sheet-footer">กระดาษคำตอบสำหรับการสอบออฟไลน์ · โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์)</footer>
+          </div>
         </section>
       </div>
     </>
