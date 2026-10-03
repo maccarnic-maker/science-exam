@@ -34,6 +34,21 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
   const submittingRef = useRef(false);
   const submitRetryTimerRef = useRef<number | null>(null);
   const hiddenStateReportedRef = useRef(false);
+  const questionsRef = useRef<Question[]>([]);
+  const answersRef = useRef<Record<string, string>>({});
+  const currentRef = useRef(0);
+
+  const setCurrentQuestion = useCallback((next: number | ((previous: number) => number)) => {
+    const nextIndex = typeof next === "function" ? next(currentRef.current) : next;
+    currentRef.current = nextIndex;
+    setCurrent(nextIndex);
+  }, []);
+
+  const selectAnswer = useCallback((questionId: string, choiceId: string) => {
+    const nextAnswers = { ...answersRef.current, [questionId]: choiceId };
+    answersRef.current = nextAnswers;
+    setAnswers(nextAnswers);
+  }, []);
 
   // 1. Initial Load & Fetch Questions with Shuffling
   useEffect(() => {
@@ -61,16 +76,21 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
       sessionIdRef.current = qData.session_id ?? null;
       timeLimitRef.current = exam.time_limit;
       setTimeLeft(exam.time_limit * 60);
-      setQuestions(qData.questions ?? []);
+      const initialQuestions = qData.questions ?? [];
+      questionsRef.current = initialQuestions;
+      answersRef.current = {};
+      currentRef.current = 0;
+      setQuestions(initialQuestions);
       setLoading(false);
     };
     load();
   }, [params.id, router]);
 
-  const reloadShuffledQuestions = useCallback(async () => {
+  const reloadShuffledQuestions = useCallback(async (preserveAnswered = false) => {
+    const previousQuestions = questionsRef.current;
+    const preservedAnswers = answersRef.current;
+    const previousCurrent = currentRef.current;
     setLoading(true);
-    setAnswers({});
-    setCurrent(0);
 
     const qParams = new URLSearchParams({
       exam_id: params.id,
@@ -90,14 +110,42 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         const qData = (await qRes.json()) as { session_id?: string; questions?: Question[] };
         sessionIdRef.current = qData.session_id ?? sessionIdRef.current;
         timeLimitRef.current = exam.time_limit;
-        setTimeLeft(exam.time_limit * 60);
-        setQuestions(qData.questions ?? []);
+        const freshQuestions = qData.questions ?? [];
+
+        if (preserveAnswered && previousQuestions.length === freshQuestions.length) {
+          const unansweredQuestions = freshQuestions.filter((question) => !preservedAnswers[question.id]);
+          let unansweredIndex = 0;
+          const mergedQuestions = previousQuestions.map((previousQuestion, index) => {
+            const question = preservedAnswers[previousQuestion.id]
+              ? previousQuestion
+              : unansweredQuestions[unansweredIndex++] ?? previousQuestion;
+
+            return { ...question, order_num: index + 1 };
+          });
+
+          questionsRef.current = mergedQuestions;
+          answersRef.current = preservedAnswers;
+          currentRef.current = Math.min(previousCurrent, Math.max(mergedQuestions.length - 1, 0));
+          setQuestions(mergedQuestions);
+          setAnswers(preservedAnswers);
+          setCurrent(currentRef.current);
+        } else {
+          questionsRef.current = freshQuestions;
+          answersRef.current = {};
+          currentRef.current = 0;
+          setQuestions(freshQuestions);
+          setAnswers({});
+          setCurrent(0);
+          setTimeLeft(exam.time_limit * 60);
+        }
       }
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
+
+    if (preserveAnswered) return;
 
     setModalConfig({
       isOpen: true,
@@ -129,11 +177,13 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session_id: sessionIdRef.current, event_type: "tab_switch" }),
         });
-        const data = (await res.json()) as { kicked?: boolean; reshuffle?: boolean; message?: string };
+        const data = (await res.json()) as { kicked?: boolean; reshuffle?: boolean; status?: string; message?: string };
         if (data.kicked) {
           setKicked(data.message ?? "คุณถูกครูผู้คุมสอบนำออกจากห้องสอบ");
         } else if (data.reshuffle) {
           reloadShuffledQuestions();
+        } else if (data.status !== "completed") {
+          await reloadShuffledQuestions(true);
         }
       } catch {
         // ignore network error
@@ -274,7 +324,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     const ansCount = Object.keys(answers).length;
     if (ansCount !== questions.length) {
       const firstUnanswered = questions.findIndex((question) => !answers[question.id]);
-      if (firstUnanswered >= 0) setCurrent(firstUnanswered);
+      if (firstUnanswered >= 0) setCurrentQuestion(firstUnanswered);
       return;
     }
 
@@ -319,14 +369,14 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
   const q = questions[current];
 
   const goToNextUnanswered = () => {
-    const nextIndex = questions.findIndex((question, index) => index > current && !answers[question.id]);
+    const nextIndex = questions.findIndex((question, index) => index > currentRef.current && !answersRef.current[question.id]);
     if (nextIndex >= 0) {
-      setCurrent(nextIndex);
+      setCurrentQuestion(nextIndex);
       return;
     }
 
-    const firstUnanswered = questions.findIndex((question) => !answers[question.id]);
-    if (firstUnanswered >= 0) setCurrent(firstUnanswered);
+    const firstUnanswered = questions.findIndex((question) => !answersRef.current[question.id]);
+    if (firstUnanswered >= 0) setCurrentQuestion(firstUnanswered);
   };
 
   // ─── Kicked by teacher screen ─────────────────────────────────────────────
@@ -425,7 +475,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
               บันทึกการสลับหน้าจอ: {tabSwitchCount} ครั้ง
             </div>
             <p className="text-xs text-slate-500 mb-6">
-              พฤติกรรมนี้ถูกส่งไปยังหน้าจอของครูผู้คุมสอบแบบ Real-time ทันที
+              ระบบจะสุ่มข้อที่ยังไม่ได้ตอบใหม่ทันที รวมถึงข้อที่กำลังเปิดอยู่ตอนตรวจพบการสลับจอ ส่วนข้อที่ตอบแล้วจะคงเดิม
             </p>
             <button
               onClick={() => setShowWarningModal(false)}
@@ -503,7 +553,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
                   <button
                     key={c.id}
                     disabled={submitting}
-                    onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: c.id }))}
+                    onClick={() => selectAnswer(q.id, c.id)}
                     className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center gap-4 group
                       ${isSelected
                         ? "border-blue-600 bg-blue-50/60 shadow-sm"
@@ -528,7 +578,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
           {/* Footer Navigation */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
             <button
-              onClick={() => setCurrent((c) => Math.max(0, c - 1))}
+              onClick={() => setCurrentQuestion((c) => Math.max(0, c - 1))}
               disabled={current === 0 || submitting}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"
             >
@@ -565,7 +615,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
               return (
                 <button
                   key={qu.id}
-                  onClick={() => setCurrent(i)}
+                  onClick={() => setCurrentQuestion(i)}
                   disabled={submitting}
                   className={`w-9 h-9 rounded-xl font-bold text-sm transition-all
                     ${isCur
