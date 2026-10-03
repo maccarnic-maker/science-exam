@@ -42,6 +42,12 @@ export async function POST(req: NextRequest) {
   const token = generateToken();
 
   try {
+    // Ensure teacher row exists to avoid Foreign Key constraint failure
+    await db
+      .prepare("INSERT INTO teachers (id, email, name) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING")
+      .bind(session.email, session.email, session.name || "ครูผู้สอน")
+      .run();
+
     await db
       .prepare("INSERT INTO exams (id, teacher_id, title, description, subject, time_limit, token) VALUES (?,?,?,?,?,?,?)")
       .bind(examId, session.email, title, description ?? "", subject ?? "วิทยาศาสตร์", time_limit ?? 60, token)

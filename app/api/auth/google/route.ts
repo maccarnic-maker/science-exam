@@ -2,6 +2,7 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSessionToken, COOKIE_NAME, ALLOWED_TEACHER_EMAIL } from "@/lib/auth-edge";
+import { getDB } from "@/lib/cloudflare";
 
 // Handler for Google OAuth sign-in redirect & callback
 export async function GET(req: NextRequest) {
@@ -68,6 +69,21 @@ export async function GET(req: NextRequest) {
     // Check teacher email authorization
     if (userData.email !== ALLOWED_TEACHER_EMAIL) {
       return NextResponse.redirect(new URL("/login?error=unauthorized", req.url));
+    }
+
+    // Save/update teacher in D1 database
+    try {
+      const db = getDB(req);
+      if (db) {
+        await db
+          .prepare(
+            "INSERT INTO teachers (id, email, name, image) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, image=excluded.image"
+          )
+          .bind(userData.email, userData.email, userData.name, userData.picture ?? null)
+          .run();
+      }
+    } catch (dbErr) {
+      console.error("Failed to save teacher to DB:", dbErr);
     }
 
     // Create session token
