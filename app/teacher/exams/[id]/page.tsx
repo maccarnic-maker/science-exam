@@ -549,12 +549,6 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
             </p>
           </header>
 
-          <div className="offline-exam-print-student-fields">
-            <span>ชื่อ - นามสกุล __________________________________________</span>
-            <span>เลขที่ __________</span>
-            <span>ห้อง __________</span>
-          </div>
-
           <div className="offline-exam-print-instructions">
             <strong>คำชี้แจง</strong> ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดเพียงคำตอบเดียว แล้วทำเครื่องหมายลงในกระดาษคำตอบ
           </div>
