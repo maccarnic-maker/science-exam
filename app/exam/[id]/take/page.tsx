@@ -319,7 +319,15 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
 
   // ─── Submitted screen ───────────────────────────────────────────────────────
   if (submitted && scoreResult) {
-    const grade = scoreResult.percent >= 80 ? "A" : scoreResult.percent >= 70 ? "B" : scoreResult.percent >= 60 ? "C" : scoreResult.percent >= 50 ? "D" : "F";
+    const performanceLevel = scoreResult.percent >= 80
+      ? "ดีเยี่ยม"
+      : scoreResult.percent >= 70
+      ? "ดี"
+      : scoreResult.percent >= 60
+      ? "ปานกลาง"
+      : scoreResult.percent >= 50
+      ? "พอใช้"
+      : "ควรปรับปรุง";
     const emoji = scoreResult.percent >= 70 ? "🎉" : scoreResult.percent >= 50 ? "😊" : "📚";
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700 flex items-center justify-center p-4">
@@ -337,8 +345,8 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
                 <p className="text-xs text-slate-400">เปอร์เซ็นต์</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-purple-600">{grade}</p>
-                <p className="text-xs text-slate-400">เกรด</p>
+                <p className="text-2xl font-bold text-purple-600">{performanceLevel}</p>
+                <p className="text-xs text-slate-400">เกณฑ์ผลการทำแบบทดสอบ</p>
               </div>
             </div>
           </div>
