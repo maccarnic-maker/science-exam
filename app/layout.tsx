@@ -6,9 +6,9 @@ export const metadata: Metadata = {
   title: "ระบบสอบออนไลน์ | โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
   description: "ระบบสอบออนไลน์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    icon: "/icon.svg?v=2",
+    shortcut: "/icon.svg?v=2",
+    apple: "/icon.svg?v=2",
   },
 };
 
@@ -20,8 +20,8 @@ export default function RootLayout({
   return (
     <html lang="th">
       <head>
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <meta name="app-version" content="1.0.5" />
+        <link rel="icon" href="/icon.svg?v=2" type="image/svg+xml" />
+        <meta name="app-version" content="1.0.6" />
         <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta httpEquiv="Pragma" content="no-cache" />
         <meta httpEquiv="Expires" content="0" />

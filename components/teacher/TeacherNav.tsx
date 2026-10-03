@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, LayoutDashboard, LogOut, Microscope } from "lucide-react";
+import { BookOpen, LayoutDashboard, LogOut, FileCheck2 } from "lucide-react";
 import Image from "next/image";
 
 interface Props {
@@ -26,7 +26,7 @@ export default function TeacherNav({ user }: Props) {
         {/* Logo */}
         <Link href="/teacher/dashboard" className="flex items-center gap-2.5 font-bold text-blue-700 text-lg">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center shadow-sm">
-            <Microscope className="w-5 h-5 text-white" />
+            <FileCheck2 className="w-5 h-5 text-white" />
           </div>
           <div>
             <span className="font-extrabold text-slate-800 text-base">ระบบสอบออนไลน์</span>
