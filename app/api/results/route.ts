@@ -3,11 +3,15 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { generateId } from "@/lib/utils";
 import { getTeacherSession } from "@/lib/auth-edge";
-import { getDB } from "@/lib/cloudflare";
+import { D1PreparedStatement, getDB } from "@/lib/cloudflare";
 
 interface ResultAnswer {
   question_id: string;
   choice_id: string;
+}
+
+interface ValidatedAnswer extends ResultAnswer {
+  isCorrect: number;
 }
 
 // POST /api/results – นักเรียนส่งคำตอบ
@@ -35,9 +39,9 @@ export async function POST(req: NextRequest) {
     if (actualSessionId) {
       // ตรวจสอบว่า session ยังอยู่หรือไม่
       const existing = await db
-        .prepare("SELECT id, exam_id, started_at, status FROM exam_sessions WHERE id = ?")
+        .prepare("SELECT id, exam_id, started_at, status, score, total_points FROM exam_sessions WHERE id = ?")
         .bind(actualSessionId)
-        .first<{ id: string; exam_id: string; started_at: number; status: string }>();
+        .first<{ id: string; exam_id: string; started_at: number; status: string; score: number | null; total_points: number | null }>();
 
       if (!existing) {
         return NextResponse.json({ error: "รอบสอบของคุณถูกยกเลิกแล้ว" }, { status: 403 });
@@ -46,7 +50,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "ข้อมูลรอบสอบไม่ตรงกัน" }, { status: 403 });
       }
       if (existing.status === "completed") {
-        return NextResponse.json({ error: "ข้อสอบชุดนี้ถูกส่งไปแล้ว" }, { status: 409 });
+        const total = existing.total_points ?? 0;
+        const score = existing.score ?? 0;
+        return NextResponse.json({
+          session_id: actualSessionId,
+          score,
+          total,
+          percent: total > 0 ? Math.round((score / total) * 100) : 0,
+          already_submitted: true,
+        });
+      }
+      if (existing.status === "submitting") {
+        return NextResponse.json({ error: "ระบบกำลังบันทึกคำตอบของคุณ กรุณารอสักครู่แล้วลองใหม่" }, { status: 409 });
       }
       sessionStartedAt = existing.started_at;
     } else {
@@ -66,7 +81,7 @@ export async function POST(req: NextRequest) {
     const examQuestions = questionRows.results ?? [];
     const questionMap = new Map(examQuestions.map((question) => [question.id, question]));
     const submittedAnswers = Array.isArray(answers) ? answers : [];
-    const normalizedAnswers: ResultAnswer[] = [];
+    const normalizedAnswers: ValidatedAnswer[] = [];
     const seenQuestionIds = new Set<string>();
 
     for (const answer of submittedAnswers) {
@@ -93,7 +108,11 @@ export async function POST(req: NextRequest) {
       }
 
       seenQuestionIds.add(candidate.question_id);
-      normalizedAnswers.push({ question_id: candidate.question_id, choice_id: candidate.choice_id });
+      normalizedAnswers.push({
+        question_id: candidate.question_id,
+        choice_id: candidate.choice_id,
+        isCorrect: choice.is_correct === 1 ? 1 : 0,
+      });
     }
 
     const missingQuestionIds = examQuestions
@@ -108,41 +127,72 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    if (!session_id) {
-      await db
-        .prepare("INSERT INTO exam_sessions (id, exam_id, classroom_id, student_name, student_number, started_at, last_active_at, status) VALUES (?,?,?,?,?, ?, ?, 'in_progress')")
-        .bind(actualSessionId, exam_id, classroom_id, student_name.trim(), student_number.trim(), sessionStartedAt, sessionStartedAt)
-        .run();
-    }
-
-    let score = 0;
     const total = examQuestions.reduce((sum, question) => sum + (question.points ?? 0), 0);
+    const score = normalizedAnswers.reduce((sum, answer) => {
+      const points = questionMap.get(answer.question_id)?.points ?? 0;
+      return sum + (answer.isCorrect === 1 ? points : 0);
+    }, 0);
+    const sessionId = actualSessionId;
+    if (!sessionId) return NextResponse.json({ error: "ไม่พบรอบสอบ" }, { status: 400 });
 
-    // ล้างคำตอบเดิมหากมี
-    await db.prepare("DELETE FROM student_answers WHERE session_id = ?").bind(actualSessionId).run();
-
-    for (const ans of normalizedAnswers) {
-      const correct = await db
-        .prepare("SELECT is_correct FROM choices WHERE id = ? AND question_id = ?")
-        .bind(ans.choice_id, ans.question_id)
-        .first<{ is_correct: number }>();
-
-      const isCorrect = correct?.is_correct === 1;
-      const pts = questionMap.get(ans.question_id)?.points ?? 0;
-      if (isCorrect) score += pts;
-
-      await db
-        .prepare("INSERT INTO student_answers (id, session_id, question_id, choice_id, is_correct) VALUES (?,?,?,?,?)")
-        .bind(generateId(), actualSessionId, ans.question_id, ans.choice_id, isCorrect ? 1 : 0)
-        .run();
+    // Claim the session and write all answer rows in one D1 transaction.
+    // Only the request that changes in_progress -> submitting may continue;
+    // concurrent requests become harmless retries instead of overwrites.
+    const statements: D1PreparedStatement[] = [];
+    if (!session_id) {
+      statements.push(
+        db
+          .prepare("INSERT INTO exam_sessions (id, exam_id, classroom_id, student_name, student_number, started_at, last_active_at, status) VALUES (?,?,?,?,?, ?, ?, 'in_progress')")
+          .bind(sessionId, exam_id, classroom_id, student_name.trim(), student_number.trim(), sessionStartedAt, sessionStartedAt)
+      );
     }
 
-    await db
-      .prepare("UPDATE exam_sessions SET submitted_at = unixepoch(), last_active_at = unixepoch(), status = 'completed', score = ?, total_points = ? WHERE id = ?")
-      .bind(score, total, actualSessionId)
-      .run();
+    statements.push(
+      db
+        .prepare("UPDATE exam_sessions SET status = 'submitting', last_active_at = unixepoch() WHERE id = ? AND status = 'in_progress'")
+        .bind(sessionId),
+      db
+        .prepare("DELETE FROM student_answers WHERE session_id = ? AND EXISTS (SELECT 1 FROM exam_sessions WHERE id = ? AND status = 'submitting')")
+        .bind(sessionId, sessionId)
+    );
 
-    return NextResponse.json({ session_id: actualSessionId, score, total, percent: total > 0 ? Math.round((score / total) * 100) : 0 });
+    for (const answer of normalizedAnswers) {
+      statements.push(
+        db
+          .prepare("INSERT INTO student_answers (id, session_id, question_id, choice_id, is_correct) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM exam_sessions WHERE id = ? AND status = 'submitting')")
+          .bind(generateId(), sessionId, answer.question_id, answer.choice_id, answer.isCorrect, sessionId)
+      );
+    }
+
+    statements.push(
+      db
+        .prepare("UPDATE exam_sessions SET submitted_at = unixepoch(), last_active_at = unixepoch(), status = 'completed', score = ?, total_points = ? WHERE id = ? AND status = 'submitting'")
+        .bind(score, total, sessionId)
+    );
+
+    await db.batch(statements);
+
+    // Return the committed result for both the winning request and any
+    // concurrent retry that arrived during the transaction.
+    const committed = await db
+      .prepare("SELECT status, score, total_points FROM exam_sessions WHERE id = ?")
+      .bind(sessionId)
+      .first<{ status: string; score: number | null; total_points: number | null }>();
+    if (!committed) {
+      return NextResponse.json({ error: "รอบสอบของคุณถูกยกเลิกแล้ว" }, { status: 403 });
+    }
+    if (committed.status === "completed") {
+      const committedTotal = committed.total_points ?? 0;
+      const committedScore = committed.score ?? 0;
+      return NextResponse.json({
+        session_id: sessionId,
+        score: committedScore,
+        total: committedTotal,
+        percent: committedTotal > 0 ? Math.round((committedScore / committedTotal) * 100) : 0,
+      });
+    }
+
+    return NextResponse.json({ error: "มีคำขอส่งข้อสอบอื่นกำลังดำเนินการ กรุณารอสักครู่แล้วลองใหม่" }, { status: 409 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
