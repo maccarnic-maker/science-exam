@@ -2,7 +2,7 @@
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FlaskConical, Clock, BookOpen, User, Hash } from "lucide-react";
+import { Microscope, Clock, BookOpen, User, Hash } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface ExamInfo { id: string; title: string; subject: string; time_limit: number; description: string }
@@ -56,7 +56,7 @@ function StudentRegisterContent({ examId }: { examId: string }) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center text-white">
-          <FlaskConical className="w-16 h-16 mx-auto mb-4 animate-pulse" />
+          <Microscope className="w-16 h-16 mx-auto mb-4 animate-pulse" />
           <p>กำลังโหลด...</p>
         </div>
       </div>
@@ -80,8 +80,9 @@ function StudentRegisterContent({ examId }: { examId: string }) {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
-            <FlaskConical className="w-10 h-10 text-white" />
+            <Microscope className="w-10 h-10 text-white" />
           </div>
+          <p className="text-xs font-bold text-blue-600 mb-1 tracking-wide">โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
           <h1 className="text-2xl font-bold text-slate-800">{exam.title}</h1>
           {exam.description && <p className="text-slate-500 text-sm mt-1">{exam.description}</p>}
 

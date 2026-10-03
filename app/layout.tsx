@@ -3,9 +3,13 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "ระบบสอบวิทยาศาสตร์ | โรงเรียนบ้านกรวย",
-  description: "ระบบสอบออนไลน์วิชาวิทยาศาสตร์ โรงเรียนบ้านกรวย",
-  icons: { icon: "/favicon.ico" },
+  title: "ระบบสอบวิทยาศาสตร์ | โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
+  description: "ระบบสอบออนไลน์วิชาวิทยาศาสตร์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -16,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="th">
       <head>
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link
           href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap"
           rel="stylesheet"

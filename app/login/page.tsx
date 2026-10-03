@@ -38,7 +38,7 @@ function LoginContent() {
             <span className="text-4xl">🔬</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-800">ระบบสอบวิทยาศาสตร์</h1>
-          <p className="text-slate-500 text-sm mt-1">โรงเรียนบ้านกรวย</p>
+          <p className="text-slate-500 text-sm mt-1 text-center font-medium">โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
         </div>
 
         {/* Error alert */}

@@ -53,7 +53,7 @@ export default function TeacherDashboard() {
               v1.0.2 (Cloudflare Live)
             </span>
           </div>
-          <p className="text-slate-500 mt-1">ระบบสอบวิชาวิทยาศาสตร์ โรงเรียนบ้านกรวย</p>
+          <p className="text-slate-500 mt-1">ระบบสอบวิชาวิทยาศาสตร์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
         </div>
       </div>
 

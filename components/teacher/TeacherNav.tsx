@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, LayoutDashboard, LogOut, FlaskConical } from "lucide-react";
+import { BookOpen, LayoutDashboard, LogOut, Microscope } from "lucide-react";
 import Image from "next/image";
 
 interface Props {
@@ -24,10 +24,17 @@ export default function TeacherNav({ user }: Props) {
     <nav className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/teacher/dashboard" className="flex items-center gap-2 font-bold text-blue-700 text-lg">
-          <FlaskConical className="w-7 h-7 text-blue-600" />
-          <span>Science Exam</span>
-          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">v1.0.2</span>
+        <Link href="/teacher/dashboard" className="flex items-center gap-2.5 font-bold text-blue-700 text-lg">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center shadow-sm">
+            <Microscope className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-slate-800 text-base">Science Exam</span>
+              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">v1.0.3</span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-normal leading-tight">รร.บ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
+          </div>
         </Link>
 
         {/* Nav links */}
