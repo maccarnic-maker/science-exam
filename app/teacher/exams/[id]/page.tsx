@@ -589,7 +589,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
                 <p>วิชา {exam.subject} · {exam.title}</p>
                 <p className="offline-answer-sheet-meta">จำนวน {questions.length} ข้อ · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน</p>
               </div>
-              <img src="/school-logo-qr.png" alt="ตราโรงเรียนบ้านครัว" className="offline-answer-sheet-logo" />
+              <img src="/school-logo.png" alt="ตราโรงเรียนบ้านครัว" className="offline-answer-sheet-logo" />
             </header>
 
             <div className="offline-answer-sheet-instruction">
