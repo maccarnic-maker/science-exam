@@ -2,7 +2,7 @@
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer, Save } from "lucide-react";
+import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer, ClipboardList, Save } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import QuestionEditor from "@/components/teacher/QuestionEditor";
@@ -133,11 +133,17 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
     }
   };
 
-  const printOfflineExam = () => {
+  const printOfflineExam = (mode: "questions" | "answers") => {
     if (questions.length === 0) {
       toast.error("ยังไม่มีข้อสอบสำหรับพิมพ์");
       return;
     }
+
+    const printClass = mode === "questions" ? "print-offline-questions" : "print-offline-answers";
+    document.body.classList.add(printClass);
+    window.addEventListener("afterprint", () => {
+      document.body.classList.remove("print-offline-questions", "print-offline-answers");
+    }, { once: true });
     window.print();
   };
 
@@ -260,10 +266,15 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={printOfflineExam}
+            <button onClick={() => printOfflineExam("questions")}
               className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 px-4 py-2 rounded-xl font-semibold text-sm transition-colors shadow-sm"
               title="พิมพ์ข้อสอบเพื่อนำไปสอบออฟไลน์">
-              <Printer className="w-4 h-4" /> พิมพ์ข้อสอบออฟไลน์
+              <Printer className="w-4 h-4" /> พิมพ์โจทย์
+            </button>
+            <button onClick={() => printOfflineExam("answers")}
+              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 px-4 py-2 rounded-xl font-semibold text-sm transition-colors shadow-sm"
+              title="พิมพ์กระดาษคำตอบแยกจากโจทย์">
+              <ClipboardList className="w-4 h-4" /> พิมพ์กระดาษคำตอบ
             </button>
             <button onClick={() => setShowQR(true)}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors shadow">
@@ -518,54 +529,92 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
       {/* Custom Confirmation / Alert Modal */}
       <CustomModal {...modalConfig} />
 
-      {/* Offline exam paper: answer keys are intentionally excluded. */}
+      {/* Offline exam papers: questions and answer sheet are printed separately. */}
       <div className="offline-exam-print" aria-hidden="true">
-        <header className="offline-exam-print-header">
-          <h1>โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์)</h1>
-          <p>แบบทดสอบวิชา {exam.subject}</p>
-          <h2>{exam.title}</h2>
-          <p className="offline-exam-print-meta">
-            จำนวน {questions.length} ข้อ · เวลา {exam.time_limit} นาที · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน
-          </p>
-        </header>
+        <section className="offline-exam-print-questions">
+          <header className="offline-exam-print-header">
+            <h1>โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์)</h1>
+            <p>แบบทดสอบวิชา {exam.subject}</p>
+            <h2>{exam.title}</h2>
+            <p className="offline-exam-print-meta">
+              จำนวน {questions.length} ข้อ · เวลา {exam.time_limit} นาที · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน
+            </p>
+          </header>
 
-        <div className="offline-exam-print-student-fields">
-          <span>ชื่อ - นามสกุล __________________________________________</span>
-          <span>เลขที่ __________</span>
-          <span>ห้อง __________</span>
-        </div>
+          <div className="offline-exam-print-student-fields">
+            <span>ชื่อ - นามสกุล __________________________________________</span>
+            <span>เลขที่ __________</span>
+            <span>ห้อง __________</span>
+          </div>
 
-        <div className="offline-exam-print-instructions">
-          <strong>คำชี้แจง</strong> ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดเพียงคำตอบเดียว แล้วทำเครื่องหมายลงในกระดาษคำตอบหรือวงกลมตัวเลือก
-        </div>
+          <div className="offline-exam-print-instructions">
+            <strong>คำชี้แจง</strong> ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดเพียงคำตอบเดียว แล้วทำเครื่องหมายลงในกระดาษคำตอบ
+          </div>
 
-        <main>
-          {questions.map((question, questionIndex) => (
-            <article className="offline-exam-print-question" key={question.id}>
-              <div className="offline-exam-print-question-text">
-                <span className="offline-exam-print-number">{questionIndex + 1}.</span>
-                <span>{question.question_text}</span>
-              </div>
-              {question.question_image && (
-                <img src={question.question_image} alt="ภาพประกอบโจทย์" className="offline-exam-print-question-image" />
-              )}
-              <div className="offline-exam-print-choices">
+          <main className="offline-exam-print-question-list">
+            {questions.map((question, questionIndex) => (
+              <article className="offline-exam-print-question" key={question.id}>
+                <div className="offline-exam-print-question-text">
+                  <span className="offline-exam-print-number">{questionIndex + 1}.</span>
+                  <span>{question.question_text}</span>
+                </div>
+                {question.question_image && (
+                  <img src={question.question_image} alt="ภาพประกอบโจทย์" className="offline-exam-print-question-image" />
+                )}
+                <div className="offline-exam-print-choices">
+                  {question.choices.map((choice, choiceIndex) => (
+                    <div className="offline-exam-print-choice" key={choice.id}>
+                      <span className="offline-exam-print-checkbox">□</span>
+                      <span className="offline-exam-print-choice-label">{LABELS[choiceIndex] ?? choiceIndex + 1}.</span>
+                      <span>{choice.choice_text}</span>
+                      {choice.choice_image && (
+                        <img src={choice.choice_image} alt="ภาพประกอบตัวเลือก" className="offline-exam-print-choice-image" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </main>
+
+          <footer className="offline-exam-print-footer">จบข้อสอบ</footer>
+        </section>
+
+        <section className="offline-exam-print-answers">
+          <header className="offline-exam-print-header">
+            <h1>โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์)</h1>
+            <p>กระดาษคำตอบวิชา {exam.subject}</p>
+            <h2>{exam.title}</h2>
+            <p className="offline-exam-print-meta">
+              จำนวน {questions.length} ข้อ · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน
+            </p>
+          </header>
+
+          <div className="offline-exam-print-student-fields">
+            <span>ชื่อ - นามสกุล __________________________________________</span>
+            <span>เลขที่ __________</span>
+            <span>ห้อง __________</span>
+          </div>
+
+          <div className="offline-exam-print-instructions">
+            <strong>คำชี้แจง</strong> ให้นักเรียนทำเครื่องหมาย ✓ หรือ ✕ ลงในช่องคำตอบที่เลือกเพียงช่องเดียวต่อข้อ
+          </div>
+
+          <div className="offline-exam-print-answer-grid">
+            {questions.map((question, questionIndex) => (
+              <div className="offline-exam-print-answer-item" key={question.id}>
+                <span className="offline-exam-print-answer-number">{questionIndex + 1}.</span>
                 {question.choices.map((choice, choiceIndex) => (
-                  <div className="offline-exam-print-choice" key={choice.id}>
-                    <span className="offline-exam-print-checkbox">□</span>
-                    <span className="offline-exam-print-choice-label">{LABELS[choiceIndex] ?? choiceIndex + 1}.</span>
-                    <span>{choice.choice_text}</span>
-                    {choice.choice_image && (
-                      <img src={choice.choice_image} alt="ภาพประกอบตัวเลือก" className="offline-exam-print-choice-image" />
-                    )}
-                  </div>
+                  <span className="offline-exam-print-answer-choice" key={choice.id}>
+                    □ {LABELS[choiceIndex] ?? choiceIndex + 1}
+                  </span>
                 ))}
               </div>
-            </article>
-          ))}
-        </main>
+            ))}
+          </div>
 
-        <footer className="offline-exam-print-footer">จบข้อสอบ</footer>
+          <footer className="offline-exam-print-footer">กระดาษคำตอบ</footer>
+        </section>
       </div>
     </>
   );

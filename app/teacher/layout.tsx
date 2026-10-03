@@ -10,7 +10,9 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <TeacherNav user={{ name: session.name, email: session.email, image: session.image }} />
+      <div className="teacher-nav-shell">
+        <TeacherNav user={{ name: session.name, email: session.email, image: session.image }} />
+      </div>
       <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
     </div>
   );

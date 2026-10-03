@@ -76,16 +76,34 @@
     color: #111827 !important;
   }
 
+  .teacher-nav-shell {
+    display: none !important;
+  }
+
   .exam-page-content {
     display: none !important;
   }
 
   .offline-exam-print {
-    display: block !important;
+    display: none !important;
     color: #111827;
     font-family: 'Noto Sans Thai', 'Sarabun', Arial, sans-serif;
     font-size: 11pt;
     line-height: 1.45;
+  }
+
+  body.print-offline-questions .offline-exam-print,
+  body.print-offline-answers .offline-exam-print {
+    display: block !important;
+  }
+
+  body.print-offline-questions .offline-exam-print-answers,
+  body.print-offline-answers .offline-exam-print-questions {
+    display: none !important;
+  }
+
+  body.print-offline-answers .offline-exam-print-answers {
+    break-before: auto;
   }
 
   .offline-exam-print-header {
@@ -128,9 +146,16 @@
     margin-bottom: 12pt;
   }
 
+  .offline-exam-print-question-list {
+    column-count: 2;
+    column-gap: 10mm;
+    column-fill: auto;
+  }
+
   .offline-exam-print-question {
     break-inside: avoid;
     margin-bottom: 10pt;
+    font-size: 9.5pt;
   }
 
   .offline-exam-print-question-text {
@@ -176,6 +201,32 @@
     max-height: 20mm;
     object-fit: contain;
     margin-left: 4pt;
+  }
+
+  .offline-exam-print-answer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7pt 18pt;
+  }
+
+  .offline-exam-print-answer-item {
+    display: flex;
+    align-items: center;
+    gap: 5pt;
+    min-height: 20pt;
+    border-bottom: 1px solid #d1d5db;
+    break-inside: avoid;
+    font-size: 10pt;
+  }
+
+  .offline-exam-print-answer-number {
+    flex: 0 0 20pt;
+    font-weight: 700;
+  }
+
+  .offline-exam-print-answer-choice {
+    white-space: nowrap;
+    letter-spacing: 0.2pt;
   }
 
   .offline-exam-print-footer {
