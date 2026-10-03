@@ -5,6 +5,8 @@ import Link from "next/link";
 import { BookOpen, PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import toast from "react-hot-toast";
 
+import CustomModal, { ModalConfig } from "@/components/ui/Modal";
+
 interface Exam {
   id: string;
   title: string;
@@ -19,6 +21,7 @@ interface Exam {
 export default function ExamsListPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
 
   const load = () => {
     fetch("/api/exams")
@@ -51,15 +54,25 @@ export default function ExamsListPage() {
     }
   };
 
-  const deleteExam = async (id: string) => {
-    if (!window.confirm("ต้องการลบชุดข้อสอบนี้ใช่หรือไม่?\n\n(ข้อมูลคะแนนและการสอบทั้งหมดในชุดนี้จะถูกลบไปด้วย)")) return;
-    const res = await fetch(`/api/exams?id=${id}`, { method: "DELETE" });
-    if (res.ok) {
-      window.alert("ลบชุดข้อสอบเรียบร้อยแล้ว");
-      load();
-    } else {
-      window.alert("เกิดข้อผิดพลาดในการลบชุดข้อสอบ");
-    }
+  const confirmDeleteExam = (exam: Exam) => {
+    setModalConfig({
+      isOpen: true,
+      title: "ยืนยันการลบชุดข้อสอบ",
+      message: `คุณต้องการลบชุดข้อสอบ "${exam.title}" ใช่หรือไม่?\nข้อมูลคะแนนและการสอบทั้งหมดในชุดนี้จะถูกลบไปด้วย`,
+      variant: "danger",
+      confirmText: "ลบชุดข้อสอบ",
+      cancelText: "ยกเลิก",
+      onConfirm: async () => {
+        const res = await fetch(`/api/exams?id=${exam.id}`, { method: "DELETE" });
+        if (res.ok) {
+          toast.success("ลบชุดข้อสอบเรียบร้อยแล้ว");
+          load();
+        } else {
+          toast.error("เกิดข้อผิดพลาดในการลบชุดข้อสอบ");
+        }
+      },
+      onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+    });
   };
 
   return (
@@ -119,8 +132,9 @@ export default function ExamsListPage() {
                   {exam.is_active ? "ปิดสอบ" : "เปิดสอบ"}
                 </button>
                 {/* Delete */}
-                <button onClick={() => deleteExam(exam.id)}
-                  className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                <button onClick={() => confirmDeleteExam(exam)}
+                  className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                  title="ลบชุดข้อสอบ">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -128,6 +142,9 @@ export default function ExamsListPage() {
           ))}
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <CustomModal {...modalConfig} />
     </div>
   );
 }

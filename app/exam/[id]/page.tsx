@@ -48,10 +48,10 @@ function StudentRegisterContent({ examId }: { examId: string }) {
 
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return window.alert("กรุณากรอกชื่อ");
-    if (!form.surname.trim()) return window.alert("กรุณากรอกนามสกุล");
-    if (!form.number.trim()) return window.alert("กรุณากรอกเลขที่");
-    if (!selectedClassroomId) return window.alert("กรุณาเลือกห้องเรียน");
+    if (!form.name.trim()) return toast.error("กรุณากรอกชื่อ");
+    if (!form.surname.trim()) return toast.error("กรุณากรอกนามสกุล");
+    if (!form.number.trim()) return toast.error("กรุณากรอกเลขที่");
+    if (!selectedClassroomId) return toast.error("กรุณาเลือกห้องเรียน");
 
     setSubmitting(true);
     const fullName = `${form.name.trim()} ${form.surname.trim()}`;

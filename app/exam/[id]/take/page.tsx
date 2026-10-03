@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, CheckCircle, AlertTriangle, ShieldAlert } from "lucide-react";
 import toast from "react-hot-toast";
+import CustomModal, { ModalConfig } from "@/components/ui/Modal";
 
 interface Choice { id: string; choice_text: string; choice_image?: string; order_num: number }
 interface Question { id: string; question_text: string; question_image?: string; points: number; order_num: number; choices: Choice[] }
@@ -24,6 +25,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
   const [kicked, setKicked] = useState<string | null>(null);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
 
   const sessionIdRef = useRef<string | null>(null);
   const studentInfo = useRef<StudentInfo | null>(null);
@@ -128,52 +130,80 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     };
   }, [loading, submitted, kicked]);
 
-  const submitExam = useCallback(async (isAuto = false) => {
+  const executeSubmit = useCallback(async () => {
     if (submitting || submitted || kicked) return;
-
-    if (!isAuto) {
-      const ansCount = Object.keys(answers).length;
-      const unAnswered = questions.length - ansCount;
-      const confirmMsg = unAnswered > 0
-        ? `คุณยังตอบไม่ครบ (ตอบไปแล้ว ${ansCount} จาก ${questions.length} ข้อ)\n\nคุณแน่ใจหรือไม่ว่าต้องการส่งข้อสอบตอนนี้? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`
-        : `คุณตอบข้อสอบครบทั้งหมด ${questions.length} ข้อแล้ว\n\nต้องการยืนยันส่งข้อสอบใช่หรือไม่? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`;
-
-      if (!window.confirm(confirmMsg)) {
-        return;
-      }
-    }
-
     setSubmitting(true);
     const info = studentInfo.current;
     if (!info) return;
 
     const ansArray = Object.entries(answers).map(([question_id, choice_id]) => ({ question_id, choice_id }));
 
-    const res = await fetch("/api/results", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        session_id: sessionIdRef.current,
-        exam_id: params.id,
-        classroom_id: info.classroom_id,
-        student_name: info.name,
-        student_number: info.number,
-        answers: ansArray,
-      }),
-    });
+    try {
+      const res = await fetch("/api/results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionIdRef.current,
+          exam_id: params.id,
+          classroom_id: info.classroom_id,
+          student_name: info.name,
+          student_number: info.number,
+          answers: ansArray,
+        }),
+      });
 
-    if (res.ok) {
-      const data = (await res.json()) as any;
-      setScoreResult(data);
-      setSubmitted(true);
-      sessionStorage.removeItem("student_info");
-      window.alert("ส่งข้อสอบเรียบร้อยแล้ว!");
-    } else {
-      const err = (await res.json()) as any;
-      window.alert(err.error ?? "ส่งข้อสอบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        setScoreResult(data);
+        setSubmitted(true);
+        sessionStorage.removeItem("student_info");
+      } else {
+        const err = (await res.json()) as any;
+        setModalConfig({
+          isOpen: true,
+          title: "ส่งข้อสอบไม่สำเร็จ",
+          message: err.error ?? "เกิดข้อผิดพลาดในการส่งข้อสอบ กรุณาลองใหม่อีกครั้ง",
+          variant: "danger",
+          isAlert: true,
+          confirmText: "ตกลง",
+          onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+        });
+      }
+    } catch {
+      setModalConfig({
+        isOpen: true,
+        title: "เกิดข้อผิดพลาดในการเชื่อมต่อ",
+        message: "ไม่สามารถส่งข้อสอบได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง",
+        variant: "danger",
+        isAlert: true,
+        confirmText: "ตกลง",
+        onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+      });
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
-  }, [answers, params.id, submitting, submitted, kicked, questions.length]);
+  }, [answers, params.id, submitting, submitted, kicked]);
+
+  const handleManualSubmit = () => {
+    const ansCount = Object.keys(answers).length;
+    const unAnswered = questions.length - ansCount;
+    const confirmMsg = unAnswered > 0
+      ? `คุณยังตอบไม่ครบ (ตอบไปแล้ว ${ansCount} จาก ${questions.length} ข้อ)\n\nคุณแน่ใจหรือไม่ว่าต้องการส่งข้อสอบตอนนี้? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`
+      : `คุณตอบข้อสอบครบทั้งหมด ${questions.length} ข้อแล้ว\n\nต้องการยืนยันส่งข้อสอบใช่หรือไม่? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`;
+
+    setModalConfig({
+      isOpen: true,
+      title: "ยืนยันการส่งข้อสอบ",
+      message: confirmMsg,
+      variant: unAnswered > 0 ? "warning" : "info",
+      confirmText: "ยืนยันส่งข้อสอบ",
+      cancelText: "กลับไปทำต่อ",
+      onConfirm: () => {
+        executeSubmit();
+      },
+      onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+    });
+  };
 
   // 3. Timer
   useEffect(() => {
@@ -182,15 +212,14 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(interval);
-          window.alert("หมดเวลาทำข้อสอบแล้ว! ระบบกำลังบันทึกและส่งข้อสอบของคุณโดยอัตโนมัติ");
-          submitExam(true);
+          executeSubmit();
           return 0;
         }
         return t - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [loading, submitted, kicked, submitExam]);
+  }, [loading, submitted, kicked, executeSubmit]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60), sec = s % 60;
@@ -406,7 +435,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
               </button>
             ) : (
               <button
-                onClick={() => submitExam(false)}
+                onClick={handleManualSubmit}
                 disabled={submitting}
                 className="btn-primary flex items-center gap-2 py-2.5 px-8 bg-green-600 hover:bg-green-700 shadow-green-200"
               >
@@ -441,6 +470,9 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      {/* Confirmation & Alert Modal */}
+      <CustomModal {...modalConfig} />
     </div>
   );
 }

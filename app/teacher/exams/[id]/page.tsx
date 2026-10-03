@@ -7,6 +7,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import QuestionEditor from "@/components/teacher/QuestionEditor";
 import QRModal from "@/components/teacher/QRModal";
+import CustomModal, { ModalConfig } from "@/components/ui/Modal";
 
 interface Choice { id: string; choice_text: string; choice_image?: string; is_correct: number; order_num: number }
 interface Question { id: string; question_text: string; question_image?: string; question_type: string; points: number; order_num: number; choices: Choice[] }
@@ -40,6 +41,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const [editQ, setEditQ] = useState<Question | null>(null);
   const [showQR, setShowQR] = useState(searchParams.get("tab") === "qr");
   const [loading, setLoading] = useState(true);
+  const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
 
   const { id } = params;
 
@@ -96,26 +98,46 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
     }
   };
 
-  const deleteQuestion = async (qId: string) => {
-    if (!window.confirm("คุณต้องการลบข้อสอบข้อนี้ใช่หรือไม่?")) return;
-    const res = await fetch(`/api/questions?id=${qId}`, { method: "DELETE" });
-    if (res.ok) {
-      window.alert("ลบข้อสอบเรียบร้อยแล้ว");
-      loadExam();
-    } else {
-      window.alert("เกิดข้อผิดพลาดในการลบข้อสอบ");
-    }
+  const deleteQuestion = (qId: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: "ยืนยันการลบข้อสอบ",
+      message: "คุณต้องการลบข้อสอบข้อนี้ใช่หรือไม่?",
+      variant: "danger",
+      confirmText: "ลบข้อสอบ",
+      cancelText: "ยกเลิก",
+      onConfirm: async () => {
+        const res = await fetch(`/api/questions?id=${qId}`, { method: "DELETE" });
+        if (res.ok) {
+          toast.success("ลบข้อสอบเรียบร้อยแล้ว");
+          loadExam();
+        } else {
+          toast.error("เกิดข้อผิดพลาดในการลบข้อสอบ");
+        }
+      },
+      onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+    });
   };
 
-  const deleteStudent = async (sessionId: string, studentName: string) => {
-    if (!window.confirm(`ต้องการลบนักเรียน "${studentName}" ออกจากรอบสอบนี้ใช่หรือไม่?\n\n(นักเรียนจะถูกตัดออกจากห้องสอบทันที)`)) return;
-    const res = await fetch(`/api/results?session_id=${sessionId}`, { method: "DELETE" });
-    if (res.ok) {
-      window.alert(`ลบนักเรียน "${studentName}" ออกจากห้องสอบเรียบร้อยแล้ว`);
-      loadResults();
-    } else {
-      window.alert("เกิดข้อผิดพลาดในการลบนักเรียน กรุณาลองใหม่อีกครั้ง");
-    }
+  const deleteStudent = (sessionId: string, studentName: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: "ยืนยันการลบนักเรียน",
+      message: `ต้องการลบนักเรียน "${studentName}" ออกจากรอบสอบนี้ใช่หรือไม่?\n\n(นักเรียนจะถูกตัดออกจากห้องสอบทันที)`,
+      variant: "danger",
+      confirmText: "ลบนักเรียน",
+      cancelText: "ยกเลิก",
+      onConfirm: async () => {
+        const res = await fetch(`/api/results?session_id=${sessionId}`, { method: "DELETE" });
+        if (res.ok) {
+          toast.success(`ลบ ${studentName} ออกจากห้องสอบแล้ว`);
+          loadResults();
+        } else {
+          toast.error("เกิดข้อผิดพลาดในการลบนักเรียน");
+        }
+      },
+      onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+    });
   };
 
   if (loading) return <div className="card text-center py-16 text-slate-400">กำลังโหลด...</div>;
@@ -365,6 +387,9 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           onClose={() => setShowQR(false)}
         />
       )}
+
+      {/* Custom Confirmation / Alert Modal */}
+      <CustomModal {...modalConfig} />
     </div>
   );
 }

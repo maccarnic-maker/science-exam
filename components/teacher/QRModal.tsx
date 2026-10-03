@@ -28,13 +28,13 @@ export default function QRModal({ examId, examTitle, examToken, classrooms, onCl
 
   const copyShortUrl = () => {
     navigator.clipboard.writeText(shortUrl);
-    window.alert(`คัดลอกลิงก์แล้ว:\n${shortUrl}`);
+    toast.success("คัดลอกลิงก์เรียบร้อยแล้ว!");
   };
 
   const copyPin = () => {
     if (!examToken) return;
     navigator.clipboard.writeText(examToken);
-    window.alert(`คัดลอกรหัสเข้าสอบ (PIN): ${examToken} แล้ว`);
+    toast.success(`คัดลอกรหัส PIN: ${examToken} เรียบร้อยแล้ว!`);
   };
 
   const downloadQR = () => {
