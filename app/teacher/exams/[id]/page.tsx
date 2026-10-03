@@ -2,11 +2,12 @@
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle } from "lucide-react";
+import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import QuestionEditor from "@/components/teacher/QuestionEditor";
 import QRModal from "@/components/teacher/QRModal";
+import ScoreReportModal from "@/components/teacher/ScoreReportModal";
 import CustomModal, { ModalConfig } from "@/components/ui/Modal";
 
 interface Choice { id: string; choice_text: string; choice_image?: string; is_correct: number; order_num: number }
@@ -42,6 +43,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const [showQR, setShowQR] = useState(searchParams.get("tab") === "qr");
   const [loading, setLoading] = useState(true);
   const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const { id } = params;
 
@@ -302,14 +304,23 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
       {/* Results & Student Anti-Cheat Monitoring Tab */}
       {tab === "ผลสอบและพฤติกรรม" && (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>
               <p className="text-sm font-semibold text-slate-700">ตรวจจับพฤติกรรม Real-time (อัปเดตอัตโนมัติทุก 3 วินาที)</p>
             </div>
-            <button onClick={loadResults} className="text-xs flex items-center gap-1 text-blue-600 hover:underline">
-              <RefreshCw className="w-3.5 h-3.5" /> รีเฟรชข้อมูล
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowReportModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 rounded-xl text-xs font-semibold shadow-xs transition-colors"
+                title="พิมพ์เอกสารรายงานคะแนน หรือดาวน์โหลดเป็น Excel (CSV)"
+              >
+                <Printer className="w-3.5 h-3.5 text-blue-600" /> พิมพ์ / ส่งออกรายงานคะแนน
+              </button>
+              <button onClick={loadResults} className="text-xs flex items-center gap-1 text-blue-600 hover:underline px-2 py-1.5">
+                <RefreshCw className="w-3.5 h-3.5" /> รีเฟรชข้อมูล
+              </button>
+            </div>
           </div>
 
           {results.length === 0 ? (
@@ -417,6 +428,19 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           examToken={exam.token}
           classrooms={classrooms}
           onClose={() => setShowQR(false)}
+        />
+      )}
+
+      {/* Score Report Modal */}
+      {showReportModal && exam && (
+        <ScoreReportModal
+          examTitle={exam.title}
+          subject={exam.subject}
+          timeLimit={exam.time_limit}
+          questionCount={questions.length}
+          classrooms={classrooms}
+          results={results}
+          onClose={() => setShowReportModal(false)}
         />
       )}
 
