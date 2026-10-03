@@ -9,7 +9,7 @@
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages && touch .vercel/output/static/.assetsignore",
     "preview": "npm run pages:build && wrangler pages dev",
-    "deploy": "npm run pages:build && wrangler pages deploy",
+    "deploy": "npm run pages:build && wrangler pages deploy .vercel/output/static --project-name science-exam",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply science-exam-db",
     "db:studio": "drizzle-kit studio"
