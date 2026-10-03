@@ -2,20 +2,31 @@
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users } from "lucide-react";
+import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import QuestionEditor from "@/components/teacher/QuestionEditor";
 import QRModal from "@/components/teacher/QRModal";
-import Image from "next/image";
 
 interface Choice { id: string; choice_text: string; choice_image?: string; is_correct: number; order_num: number }
 interface Question { id: string; question_text: string; question_image?: string; question_type: string; points: number; order_num: number; choices: Choice[] }
 interface Classroom { id: string; name: string; grade: string }
 interface Exam { id: string; title: string; subject: string; time_limit: number; is_active: number; token: string; description: string }
-interface Result { id: string; student_name: string; student_number: string; classroom_name: string; score: number; total_points: number; submitted_at: number }
+interface Result {
+  id: string;
+  student_name: string;
+  student_number: string;
+  classroom_name: string;
+  score: number | null;
+  total_points: number | null;
+  started_at: number;
+  submitted_at: number | null;
+  last_active_at: number | null;
+  tab_switches: number;
+  status: string;
+}
 
-const TABS = ["ข้อสอบ", "ผลสอบ"] as const;
+const TABS = ["ข้อสอบ", "ผลสอบและพฤติกรรม"] as const;
 const LABELS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
 
 function ExamDetailContent({ params }: { params: { id: string } }) {
@@ -33,15 +44,18 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const { id } = params;
 
   const loadExam = async () => {
-    const [eRes, qRes, cRes] = await Promise.all([
+    const [eRes, qRes] = await Promise.all([
       fetch(`/api/exams`),
       fetch(`/api/questions?exam_id=${id}`),
-      fetch(`/api/exams`), // reuse
     ]);
-    const exams: Exam[] = await eRes.json();
-    const found = exams.find((e) => e.id === id);
-    setExam(found ?? null);
-    setQuestions(await qRes.json());
+    if (eRes.ok) {
+      const exams: Exam[] = await eRes.json();
+      const found = exams.find((e) => e.id === id);
+      setExam(found ?? null);
+    }
+    if (qRes.ok) {
+      setQuestions(await qRes.json());
+    }
     setLoading(false);
   };
 
@@ -52,39 +66,63 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
 
   const loadResults = async () => {
     const res = await fetch(`/api/results?exam_id=${id}`);
-    if (res.ok) setResults(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setResults(Array.isArray(data) ? data : []);
+    }
   };
 
   useEffect(() => { loadExam(); loadClassrooms(); }, [id]);
-  useEffect(() => { if (tab === "ผลสอบ") loadResults(); }, [tab]);
+  
+  // Real-time polling when viewing student behavior and results tab
+  useEffect(() => {
+    if (tab === "ผลสอบและพฤติกรรม") {
+      loadResults();
+      const timer = setInterval(loadResults, 3000); // อัปเดตพฤติกรรมทุก 3 วินาที
+      return () => clearInterval(timer);
+    }
+  }, [tab, id]);
 
   const toggleActive = async () => {
     if (!exam) return;
-    await fetch("/api/exams", {
+    const res = await fetch("/api/exams", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: exam.id, is_active: !exam.is_active }),
+      body: JSON.stringify({ id, is_active: !exam.is_active }),
     });
-    toast.success(exam.is_active ? "ปิดการสอบแล้ว" : "เปิดการสอบแล้ว!");
-    loadExam();
+    if (res.ok) {
+      setExam((prev) => prev ? { ...prev, is_active: prev.is_active ? 0 : 1 } : null);
+      toast.success(exam.is_active ? "ปิดการสอบแล้ว" : "เปิดการสอบแล้ว");
+    }
   };
 
-  const deleteQ = async (qId: string) => {
-    if (!confirm("ลบข้อนี้?")) return;
-    await fetch(`/api/questions?id=${qId}`, { method: "DELETE" });
-    toast.success("ลบแล้ว");
-    loadExam();
+  const deleteQuestion = async (qId: string) => {
+    if (!confirm("ต้องการลบข้อสอบนี้?")) return;
+    const res = await fetch(`/api/questions?id=${qId}`, { method: "DELETE" });
+    if (res.ok) { toast.success("ลบข้อสอบแล้ว"); loadExam(); }
   };
 
-  if (loading) return <div className="card text-center py-20 text-slate-400">กำลังโหลด...</div>;
-  if (!exam) return <div className="card text-center py-20 text-slate-400">ไม่พบชุดข้อสอบ</div>;
+  const deleteStudent = async (sessionId: string, studentName: string) => {
+    if (!confirm(`ต้องการลบนักเรียน "${studentName}" ออกจากรอบสอบนี้ใช่หรือไม่? \n(นักเรียนจะถูกตัดออกจากห้องสอบทันที)`)) return;
+    const res = await fetch(`/api/results?session_id=${sessionId}`, { method: "DELETE" });
+    if (res.ok) {
+      toast.success(`ลบ ${studentName} ออกจากห้องสอบแล้ว`);
+      loadResults();
+    } else {
+      toast.error("เกิดข้อผิดพลาดในการลบ");
+    }
+  };
+
+  if (loading) return <div className="card text-center py-16 text-slate-400">กำลังโหลด...</div>;
+  if (!exam) return <div className="card text-center py-16 text-slate-400">ไม่พบชุดข้อสอบ</div>;
 
   return (
     <div className="animate-fade-in">
-      {/* Back */}
-      <Link href="/teacher/exams" className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 mb-6 text-sm font-semibold">
-        <ArrowLeft className="w-4 h-4" /> ชุดข้อสอบทั้งหมด
-      </Link>
+      <div className="mb-4">
+        <Link href="/teacher/exams" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> กลับหน้ารายการข้อสอบ
+        </Link>
+      </div>
 
       {/* Exam Header */}
       <div className="card mb-6">
@@ -92,9 +130,12 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className={exam.is_active ? "badge-active" : "badge-inactive"}>
-                {exam.is_active ? "🟢 เปิดสอบ" : "⭕ ปิดอยู่"}
+                {exam.is_active ? "🟢 เปิดสอบอยู่" : "⭕ ปิดอยู่"}
               </span>
               <span className="text-xs text-slate-400">{exam.subject}</span>
+              <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">
+                🎲 สุ่มข้อสอบและตัวเลือกอัตโนมัติ
+              </span>
             </div>
             <h1 className="text-2xl font-bold text-slate-800">{exam.title}</h1>
             {exam.description && <p className="text-slate-500 text-sm mt-1">{exam.description}</p>}
@@ -105,7 +146,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setShowQR(true)}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors shadow">
-              <QrCode className="w-4 h-4" /> QR / ลิงค์
+              <QrCode className="w-4 h-4" /> QR / ลิงค์ข้อสอบ
             </button>
             <button onClick={toggleActive}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-colors
@@ -120,9 +161,9 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
       <div className="flex border-b border-slate-200 mb-6 gap-1">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-2 font-semibold text-sm rounded-t-xl transition-colors
-              ${tab === t ? "bg-white border border-b-white border-slate-200 text-blue-700 -mb-px" : "text-slate-500 hover:text-slate-700"}`}>
-            {t === "ข้อสอบ" ? `📝 ${t} (${questions.length})` : `📊 ${t} (${results.length})`}
+            className={`px-5 py-2.5 font-semibold text-sm rounded-t-xl transition-colors
+              ${tab === t ? "bg-white border border-b-white border-slate-200 text-blue-700 -mb-px shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+            {t === "ข้อสอบ" ? `📝 ${t} (${questions.length})` : `👀 ${t} (${results.length})`}
           </button>
         ))}
       </div>
@@ -163,32 +204,36 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
                   <p className="font-semibold text-slate-800">{q.question_text}</p>
                   {q.question_image && (
                     <div className="mt-2 relative w-48 h-32 rounded-xl overflow-hidden border border-slate-200">
-                      <Image src={q.question_image} alt="โจทย์" fill className="object-cover" />
+                      <img src={q.question_image} alt="โจทย์" className="w-full h-full object-cover" />
                     </div>
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-lg font-semibold">{q.points} คะแนน</span>
                   <button onClick={() => { setEditQ(q); setAddingQ(false); }}
-                    className="text-slate-400 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => deleteQ(q.id)}
-                    className="text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => deleteQuestion(q.id)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 pl-11">
+
+              {/* Choices preview */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pl-11">
                 {q.choices.map((c, ci) => (
-                  <div key={c.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm
-                    ${c.is_correct ? "bg-green-50 border border-green-200 text-green-800 font-semibold" : "bg-slate-50 text-slate-600"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                      ${c.is_correct ? "bg-green-500 text-white" : "bg-slate-300 text-slate-600"}`}>
-                      {LABELS[ci]}
+                  <div key={c.id}
+                    className={`flex items-center gap-2 p-2 rounded-lg text-sm border
+                      ${c.is_correct ? "border-green-300 bg-green-50 text-green-800 font-semibold" : "border-slate-100 bg-slate-50 text-slate-600"}`}>
+                    <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-xs font-bold shadow-xs">
+                      {LABELS[ci] ?? ci + 1}
                     </span>
+                    <span className="flex-1">{c.choice_text}</span>
                     {c.choice_image && (
-                      <div className="relative w-8 h-8 rounded overflow-hidden flex-shrink-0">
-                        <Image src={c.choice_image} alt="" fill className="object-cover" />
-                      </div>
+                      <img src={c.choice_image} alt="" className="w-8 h-6 object-cover rounded" />
                     )}
-                    <span className="truncate">{c.choice_text}</span>
+                    {c.is_correct === 1 && <span className="text-xs text-green-600 font-bold">✓ คำตอบที่ถูก</span>}
                   </div>
                 ))}
               </div>
@@ -197,48 +242,103 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
 
           {!addingQ && !editQ && (
             <button onClick={() => { setAddingQ(true); setEditQ(null); }}
-              className="w-full btn-primary flex items-center justify-center gap-2">
+              className="w-full btn-primary flex items-center justify-center gap-2 py-3">
               <PlusCircle className="w-5 h-5" /> เพิ่มข้อสอบ
             </button>
           )}
         </div>
       )}
 
-      {/* Results Tab */}
-      {tab === "ผลสอบ" && (
+      {/* Results & Student Anti-Cheat Monitoring Tab */}
+      {tab === "ผลสอบและพฤติกรรม" && (
         <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>
+              <p className="text-sm font-semibold text-slate-700">ตรวจจับพฤติกรรม Real-time (อัปเดตอัตโนมัติทุก 3 วินาที)</p>
+            </div>
+            <button onClick={loadResults} className="text-xs flex items-center gap-1 text-blue-600 hover:underline">
+              <RefreshCw className="w-3.5 h-3.5" /> รีเฟรชข้อมูล
+            </button>
+          </div>
+
           {results.length === 0 ? (
             <div className="card text-center py-16">
               <Users className="w-16 h-16 text-slate-200 mx-auto mb-3" />
-              <p className="text-slate-400">ยังไม่มีนักเรียนส่งข้อสอบ</p>
+              <p className="text-slate-400">ยังไม่มีนักเรียนเข้าห้องสอบ</p>
             </div>
           ) : (
-            <div className="card overflow-x-auto">
+            <div className="card overflow-x-auto p-0">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="text-left py-3 px-3 font-semibold">#</th>
-                    <th className="text-left py-3 px-3 font-semibold">ชื่อ-นามสกุล</th>
-                    <th className="text-left py-3 px-3 font-semibold">เลขที่</th>
-                    <th className="text-left py-3 px-3 font-semibold">ห้อง</th>
-                    <th className="text-right py-3 px-3 font-semibold">คะแนน</th>
-                    <th className="text-right py-3 px-3 font-semibold">%</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 text-xs">
+                    <th className="text-left py-3.5 px-4 font-bold">#</th>
+                    <th className="text-left py-3.5 px-4 font-bold">ชื่อ-นามสกุล</th>
+                    <th className="text-left py-3.5 px-4 font-bold">เลขที่</th>
+                    <th className="text-left py-3.5 px-4 font-bold">ห้อง</th>
+                    <th className="text-center py-3.5 px-4 font-bold">สถานะทำข้อสอบ</th>
+                    <th className="text-center py-3.5 px-4 font-bold">พฤติกรรมการสลับจอ</th>
+                    <th className="text-right py-3.5 px-4 font-bold">คะแนน</th>
+                    <th className="text-center py-3.5 px-4 font-bold">จัดการ</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {results.map((r, i) => {
-                    const pct = r.total_points > 0 ? Math.round((r.score / r.total_points) * 100) : 0;
+                    const isSubmitted = r.status === "completed" || r.submitted_at !== null;
+                    const pct = (r.total_points ?? 0) > 0 ? Math.round(((r.score ?? 0) / r.total_points!) * 100) : 0;
+                    const hasCheating = (r.tab_switches ?? 0) > 0;
+
                     return (
-                      <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="py-3 px-3 text-slate-400">{i + 1}</td>
-                        <td className="py-3 px-3 font-semibold text-slate-800">{r.student_name}</td>
-                        <td className="py-3 px-3 text-slate-500">{r.student_number}</td>
-                        <td className="py-3 px-3 text-slate-500">{r.classroom_name}</td>
-                        <td className="py-3 px-3 text-right font-bold text-slate-800">{r.score}/{r.total_points}</td>
-                        <td className="py-3 px-3 text-right">
-                          <span className={`font-bold ${pct >= 70 ? "text-green-600" : pct >= 50 ? "text-yellow-600" : "text-red-500"}`}>
-                            {pct}%
-                          </span>
+                      <tr key={r.id} className={`hover:bg-slate-50 transition-colors ${hasCheating ? "bg-red-50/30" : ""}`}>
+                        <td className="py-3.5 px-4 text-slate-400">{i + 1}</td>
+                        <td className="py-3.5 px-4 font-bold text-slate-800">
+                          {r.student_name}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-500 font-mono">{r.student_number}</td>
+                        <td className="py-3.5 px-4 text-slate-500">{r.classroom_name}</td>
+                        <td className="py-3.5 px-4 text-center">
+                          {isSubmitted ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                              ✓ ส่งแล้ว
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200 animate-pulse">
+                              ✍️ กำลังทำข้อสอบ
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          {hasCheating ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full border border-red-300 animate-bounce-short">
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                              สลับหน้าจอ {r.tab_switches} ครั้ง!
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center text-xs font-medium text-slate-400">
+                              ปกติ (ไม่สลับจอ)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          {isSubmitted ? (
+                            <div>
+                              <span className="font-bold text-slate-800">{r.score}/{r.total_points}</span>
+                              <span className={`ml-2 font-bold text-xs ${pct >= 70 ? "text-green-600" : pct >= 50 ? "text-yellow-600" : "text-red-500"}`}>
+                                ({pct}%)
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            onClick={() => deleteStudent(r.id, r.student_name)}
+                            className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg border border-red-200 font-semibold transition-colors"
+                            title="ลบนักเรียนคนนี้ออกจากห้องสอบ"
+                          >
+                            <UserX className="w-3.5 h-3.5" /> ลบนักเรียน
+                          </button>
                         </td>
                       </tr>
                     );
