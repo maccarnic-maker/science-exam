@@ -36,6 +36,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ kicked: true, message: "คุณถูกครูผู้คุมสอบนำออกจากห้องสอบ" }, { status: 403 });
     }
 
+    if (current.status === "reshuffle") {
+      // ครูสั่งสุ่มข้อสอบใหม่ -> เปลี่ยนสถานะกลับเป็น in_progress แล้วแจ้ง client
+      await db
+        .prepare("UPDATE exam_sessions SET status = 'in_progress', last_active_at = unixepoch() WHERE id = ?")
+        .bind(session_id)
+        .run();
+
+      return NextResponse.json({ reshuffle: true, status: "in_progress" });
+    }
+
     return NextResponse.json({ success: true, status: current.status });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

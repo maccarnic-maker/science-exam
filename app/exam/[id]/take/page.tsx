@@ -63,7 +63,50 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     load();
   }, [params.id, router]);
 
-  // 2. Anti-Cheat: Detect Tab Switch / App Blur / Window Minimize
+  const reloadShuffledQuestions = useCallback(async () => {
+    setLoading(true);
+    setAnswers({});
+    setCurrent(0);
+
+    const qParams = new URLSearchParams({
+      exam_id: params.id,
+      classroom_id: studentInfo.current?.classroom_id ?? "",
+      student_name: studentInfo.current?.name ?? "",
+      student_number: studentInfo.current?.number ?? "",
+    });
+
+    try {
+      const [eRes, qRes] = await Promise.all([
+        fetch(`/api/exam-info?id=${params.id}`),
+        fetch(`/api/questions/public?${qParams.toString()}`),
+      ]);
+
+      if (eRes.ok && qRes.ok) {
+        const exam = (await eRes.json()) as any;
+        const qData = (await qRes.json()) as { session_id?: string; questions?: Question[] };
+        sessionIdRef.current = qData.session_id ?? sessionIdRef.current;
+        timeLimitRef.current = exam.time_limit;
+        setTimeLeft(exam.time_limit * 60);
+        setQuestions(qData.questions ?? []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+
+    setModalConfig({
+      isOpen: true,
+      title: "ครูผู้คุมสอบสั่งสุ่มข้อสอบใหม่!",
+      message: "ตรวจพบพฤติกรรมผิดปกติ หรือครูผู้คุมสอบสั่งสลับข้อสอบใหม่ให้คุณ\n\nระบบได้ทำการรีเซ็ตคำตอบและจัดลำดับข้อสอบชุดใหม่ให้เรียบร้อยแล้ว กรุณาเริ่มทำข้อสอบใหม่อีกครั้ง",
+      variant: "warning",
+      isAlert: true,
+      confirmText: "รับทราบ และเริ่มทำใหม่",
+      onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+    });
+  }, [params.id]);
+
+  // 2. Anti-Cheat: Detect Tab Switch / App Blur / Window Minimize & Real-time commands
   useEffect(() => {
     if (loading || submitted || kicked) return;
 
@@ -81,9 +124,11 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ session_id: sessionIdRef.current, event_type: "tab_switch" }),
           });
-          const data = (await res.json()) as { kicked?: boolean; message?: string };
+          const data = (await res.json()) as { kicked?: boolean; reshuffle?: boolean; message?: string };
           if (data.kicked) {
             setKicked(data.message ?? "คุณถูกครูผู้คุมสอบนำออกจากห้องสอบ");
+          } else if (data.reshuffle) {
+            reloadShuffledQuestions();
           }
         } catch {
           // ignore network error
@@ -104,7 +149,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleWindowBlur);
 
-    // Heartbeat every 10 seconds to keep live presence & check kick status
+    // Heartbeat every 3 seconds to keep live presence & check kick/reshuffle status
     const heartbeatTimer = setInterval(async () => {
       if (sessionIdRef.current) {
         try {
@@ -113,22 +158,24 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ session_id: sessionIdRef.current, event_type: "heartbeat" }),
           });
-          const data = (await res.json()) as { kicked?: boolean; message?: string };
+          const data = (await res.json()) as { kicked?: boolean; reshuffle?: boolean; message?: string };
           if (data.kicked) {
             setKicked(data.message ?? "คุณถูกครูผู้คุมสอบนำออกจากห้องสอบ");
+          } else if (data.reshuffle) {
+            reloadShuffledQuestions();
           }
         } catch {
           // ignore
         }
       }
-    }, 10000);
+    }, 3000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", handleWindowBlur);
       clearInterval(heartbeatTimer);
     };
-  }, [loading, submitted, kicked]);
+  }, [loading, submitted, kicked, reloadShuffledQuestions]);
 
   const executeSubmit = useCallback(async () => {
     if (submitting || submitted || kicked) return;

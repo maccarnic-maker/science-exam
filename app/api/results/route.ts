@@ -123,3 +123,34 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// PUT /api/results?session_id=xxx&action=reshuffle – ครูสั่งสุ่มข้อสอบใหม่ให้นักเรียนทำใหม่
+export async function PUT(req: NextRequest) {
+  const session = await getTeacherSession(req);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const db = getDB(req);
+  if (!db) return NextResponse.json({ error: "DB not available" }, { status: 500 });
+
+  const { searchParams } = new URL(req.url);
+  const sessionId = searchParams.get("session_id");
+  if (!sessionId) return NextResponse.json({ error: "Missing session_id" }, { status: 400 });
+
+  try {
+    // 1. ลบคำตอบที่นักเรียนบันทึกไว้
+    await db.prepare("DELETE FROM student_answers WHERE session_id = ?").bind(sessionId).run();
+
+    // 2. ปรับสถานะเป็น reshuffle และรีเซ็ตเวลาและคะแนน
+    await db
+      .prepare(
+        "UPDATE exam_sessions SET status = 'reshuffle', score = NULL, total_points = NULL, submitted_at = NULL, started_at = unixepoch(), last_active_at = unixepoch() WHERE id = ?"
+      )
+      .bind(sessionId)
+      .run();
+
+    return NextResponse.json({ success: true, message: "สั่งสุ่มข้อสอบใหม่ให้นักเรียนแล้ว" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

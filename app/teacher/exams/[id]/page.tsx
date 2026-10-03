@@ -2,7 +2,7 @@
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw } from "lucide-react";
+import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import QuestionEditor from "@/components/teacher/QuestionEditor";
@@ -134,6 +134,29 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           loadResults();
         } else {
           toast.error("เกิดข้อผิดพลาดในการลบนักเรียน");
+        }
+      },
+      onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+    });
+  };
+
+  const reshuffleStudentExam = (sessionId: string, studentName: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: "สุ่มข้อสอบใหม่ให้นักเรียน",
+      message: `คุณต้องการสุ่มชุดข้อสอบใหม่ให้นักเรียน "${studentName}" ใช่หรือไม่?\n\n• คำตอบที่ทำค้างไว้จะถูกล้างออก\n• ระบบจะสุ่มสลับลำดับข้อสอบและตัวเลือกใหม่ทั้งหมดทันที\n• หน้าจอของนักเรียนจะรีเซ็ตและเริ่มทำข้อสอบชุดใหม่ทันที`,
+      variant: "warning",
+      confirmText: "สุ่มข้อสอบใหม่",
+      cancelText: "ยกเลิก",
+      onConfirm: async () => {
+        const res = await fetch(`/api/results?session_id=${sessionId}&action=reshuffle`, {
+          method: "PUT",
+        });
+        if (res.ok) {
+          toast.success(`ส่งคำสั่งสุ่มข้อสอบใหม่ให้ ${studentName} แล้ว`);
+          loadResults();
+        } else {
+          toast.error("เกิดข้อผิดพลาดในการสุ่มข้อสอบ");
         }
       },
       onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
@@ -359,13 +382,22 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
                           )}
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <button
-                            onClick={() => deleteStudent(r.id, r.student_name)}
-                            className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg border border-red-200 font-semibold transition-colors"
-                            title="ลบนักเรียนคนนี้ออกจากห้องสอบ"
-                          >
-                            <UserX className="w-3.5 h-3.5" /> ลบนักเรียน
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => reshuffleStudentExam(r.id, r.student_name)}
+                              className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg border border-amber-200 font-semibold transition-colors"
+                              title="สุ่มข้อสอบและตัวเลือกใหม่ให้นักเรียนทำใหม่ทันที"
+                            >
+                              <Shuffle className="w-3.5 h-3.5" /> สุ่มข้อสอบใหม่
+                            </button>
+                            <button
+                              onClick={() => deleteStudent(r.id, r.student_name)}
+                              className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg border border-red-200 font-semibold transition-colors"
+                              title="ลบนักเรียนคนนี้ออกจากห้องสอบ"
+                            >
+                              <UserX className="w-3.5 h-3.5" /> ลบ
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
