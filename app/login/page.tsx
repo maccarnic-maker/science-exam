@@ -71,7 +71,7 @@ function LoginContent() {
         </button>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          เฉพาะ <span className="font-semibold text-blue-600">maccarnic@gmail.com</span> เท่านั้น
+          ผู้ที่ได้รับสิทธิ์เท่านั้น
         </p>
       </div>
     </div>
