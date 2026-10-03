@@ -128,20 +128,21 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     };
   }, [loading, submitted, kicked]);
 
-  // 3. Timer
-  useEffect(() => {
-    if (loading || submitted || kicked) return;
-    const interval = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(interval); submitExam(); return 0; }
-        return t - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [loading, submitted, kicked]);
-
-  const submitExam = useCallback(async () => {
+  const submitExam = useCallback(async (isAuto = false) => {
     if (submitting || submitted || kicked) return;
+
+    if (!isAuto) {
+      const ansCount = Object.keys(answers).length;
+      const unAnswered = questions.length - ansCount;
+      const confirmMsg = unAnswered > 0
+        ? `คุณยังตอบไม่ครบ (ตอบไปแล้ว ${ansCount} จาก ${questions.length} ข้อ)\n\nคุณแน่ใจหรือไม่ว่าต้องการส่งข้อสอบตอนนี้? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`
+        : `คุณตอบข้อสอบครบทั้งหมด ${questions.length} ข้อแล้ว\n\nต้องการยืนยันส่งข้อสอบใช่หรือไม่? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`;
+
+      if (!window.confirm(confirmMsg)) {
+        return;
+      }
+    }
+
     setSubmitting(true);
     const info = studentInfo.current;
     if (!info) return;
@@ -166,12 +167,30 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
       setScoreResult(data);
       setSubmitted(true);
       sessionStorage.removeItem("student_info");
+      window.alert("ส่งข้อสอบเรียบร้อยแล้ว!");
     } else {
       const err = (await res.json()) as any;
-      toast.error(err.error ?? "ส่งข้อสอบไม่สำเร็จ กรุณาลองใหม่");
+      window.alert(err.error ?? "ส่งข้อสอบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     }
     setSubmitting(false);
-  }, [answers, params.id, submitting, submitted, kicked]);
+  }, [answers, params.id, submitting, submitted, kicked, questions.length]);
+
+  // 3. Timer
+  useEffect(() => {
+    if (loading || submitted || kicked) return;
+    const interval = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(interval);
+          window.alert("หมดเวลาทำข้อสอบแล้ว! ระบบกำลังบันทึกและส่งข้อสอบของคุณโดยอัตโนมัติ");
+          submitExam(true);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [loading, submitted, kicked, submitExam]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60), sec = s % 60;
@@ -387,7 +406,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
               </button>
             ) : (
               <button
-                onClick={submitExam}
+                onClick={() => submitExam(false)}
                 disabled={submitting}
                 className="btn-primary flex items-center gap-2 py-2.5 px-8 bg-green-600 hover:bg-green-700 shadow-green-200"
               >

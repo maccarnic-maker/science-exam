@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function generateToken(): string {
-  return crypto.randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export function generateId(): string {

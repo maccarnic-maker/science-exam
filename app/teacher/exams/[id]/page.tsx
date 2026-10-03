@@ -97,19 +97,24 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   };
 
   const deleteQuestion = async (qId: string) => {
-    if (!confirm("ต้องการลบข้อสอบนี้?")) return;
+    if (!window.confirm("คุณต้องการลบข้อสอบข้อนี้ใช่หรือไม่?")) return;
     const res = await fetch(`/api/questions?id=${qId}`, { method: "DELETE" });
-    if (res.ok) { toast.success("ลบข้อสอบแล้ว"); loadExam(); }
+    if (res.ok) {
+      window.alert("ลบข้อสอบเรียบร้อยแล้ว");
+      loadExam();
+    } else {
+      window.alert("เกิดข้อผิดพลาดในการลบข้อสอบ");
+    }
   };
 
   const deleteStudent = async (sessionId: string, studentName: string) => {
-    if (!confirm(`ต้องการลบนักเรียน "${studentName}" ออกจากรอบสอบนี้ใช่หรือไม่? \n(นักเรียนจะถูกตัดออกจากห้องสอบทันที)`)) return;
+    if (!window.confirm(`ต้องการลบนักเรียน "${studentName}" ออกจากรอบสอบนี้ใช่หรือไม่?\n\n(นักเรียนจะถูกตัดออกจากห้องสอบทันที)`)) return;
     const res = await fetch(`/api/results?session_id=${sessionId}`, { method: "DELETE" });
     if (res.ok) {
-      toast.success(`ลบ ${studentName} ออกจากห้องสอบแล้ว`);
+      window.alert(`ลบนักเรียน "${studentName}" ออกจากห้องสอบเรียบร้อยแล้ว`);
       loadResults();
     } else {
-      toast.error("เกิดข้อผิดพลาดในการลบ");
+      window.alert("เกิดข้อผิดพลาดในการลบนักเรียน กรุณาลองใหม่อีกครั้ง");
     }
   };
 
@@ -355,6 +360,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
         <QRModal
           examId={id}
           examTitle={exam.title}
+          examToken={exam.token}
           classrooms={classrooms}
           onClose={() => setShowQR(false)}
         />

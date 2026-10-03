@@ -14,25 +14,32 @@ function StudentRegisterContent({ examId }: { examId: string }) {
   const classroomId = searchParams.get("cls");
 
   const [exam, setExam] = useState<ExamInfo | null>(null);
-  const [classroom, setClassroom] = useState<Classroom | null>(null);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string>(classroomId ?? "");
   const [form, setForm] = useState({ name: "", surname: "", number: "" });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  const selectedClassroom = classrooms.find((c) => c.id === selectedClassroomId);
 
   useEffect(() => {
     const load = async () => {
       const [eRes, cRes] = await Promise.all([
         fetch(`/api/exam-info?id=${examId}`),
-        classroomId ? fetch(`/api/classrooms?exam_id=${examId}`) : Promise.resolve(null),
+        fetch(`/api/classrooms?exam_id=${examId}`),
       ]);
 
       if (!eRes.ok) { setLoading(false); return; }
       setExam(await eRes.json());
 
-      if (cRes?.ok) {
-        const cls: Classroom[] = await cRes.json();
-        const found = cls.find((c) => c.id === classroomId);
-        setClassroom(found ?? null);
+      if (cRes.ok) {
+        const clsList: Classroom[] = await cRes.json();
+        setClassrooms(clsList);
+        if (classroomId && clsList.some((c) => c.id === classroomId)) {
+          setSelectedClassroomId(classroomId);
+        } else if (clsList.length === 1) {
+          setSelectedClassroomId(clsList[0].id);
+        }
       }
       setLoading(false);
     };
@@ -41,14 +48,14 @@ function StudentRegisterContent({ examId }: { examId: string }) {
 
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return toast.error("กรุณากรอกชื่อ");
-    if (!form.surname.trim()) return toast.error("กรุณากรอกนามสกุล");
-    if (!form.number.trim()) return toast.error("กรุณากรอกเลขที่");
-    if (!classroomId) return toast.error("ไม่พบข้อมูลห้องเรียน");
+    if (!form.name.trim()) return window.alert("กรุณากรอกชื่อ");
+    if (!form.surname.trim()) return window.alert("กรุณากรอกนามสกุล");
+    if (!form.number.trim()) return window.alert("กรุณากรอกเลขที่");
+    if (!selectedClassroomId) return window.alert("กรุณาเลือกห้องเรียน");
 
     setSubmitting(true);
     const fullName = `${form.name.trim()} ${form.surname.trim()}`;
-    sessionStorage.setItem("student_info", JSON.stringify({ name: fullName, number: form.number, classroom_id: classroomId }));
+    sessionStorage.setItem("student_info", JSON.stringify({ name: fullName, number: form.number, classroom_id: selectedClassroomId }));
     router.push(`/exam/${examId}/take`);
   };
 
@@ -91,10 +98,10 @@ function StudentRegisterContent({ examId }: { examId: string }) {
               <Clock className="w-4 h-4 text-blue-500" />
               <span>{exam.time_limit} นาที</span>
             </div>
-            {classroom && (
+            {selectedClassroom && (
               <div className="flex items-center gap-1 text-sm text-slate-500">
                 <BookOpen className="w-4 h-4 text-green-500" />
-                <span>{classroom.grade} {classroom.name}</span>
+                <span>{selectedClassroom.grade} {selectedClassroom.name}</span>
               </div>
             )}
           </div>
@@ -102,6 +109,27 @@ function StudentRegisterContent({ examId }: { examId: string }) {
 
         {/* Form */}
         <form onSubmit={start} className="space-y-4">
+          {classrooms.length > 1 && !classroomId && (
+            <div>
+              <label className="label">ห้องเรียน</label>
+              <div className="relative">
+                <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <select
+                  className="input-field pl-10"
+                  value={selectedClassroomId}
+                  onChange={(e) => setSelectedClassroomId(e.target.value)}
+                  required
+                >
+                  <option value="">-- เลือกห้องเรียน --</option>
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.grade} {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div>
             <label className="label">ชื่อ</label>
             <div className="relative">

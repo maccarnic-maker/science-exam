@@ -52,9 +52,14 @@ export default function ExamsListPage() {
   };
 
   const deleteExam = async (id: string) => {
-    if (!confirm("ต้องการลบชุดข้อสอบนี้?")) return;
+    if (!window.confirm("ต้องการลบชุดข้อสอบนี้ใช่หรือไม่?\n\n(ข้อมูลคะแนนและการสอบทั้งหมดในชุดนี้จะถูกลบไปด้วย)")) return;
     const res = await fetch(`/api/exams?id=${id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("ลบแล้ว"); load(); }
+    if (res.ok) {
+      window.alert("ลบชุดข้อสอบเรียบร้อยแล้ว");
+      load();
+    } else {
+      window.alert("เกิดข้อผิดพลาดในการลบชุดข้อสอบ");
+    }
   };
 
   return (

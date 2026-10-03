@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { X, Copy, Download, QrCode, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { X, Copy, Download, QrCode, ExternalLink, KeyRound } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import toast from "react-hot-toast";
 import { SCHOOL_LOGO_BASE64 } from "@/lib/school-logo";
@@ -10,21 +10,31 @@ interface Classroom { id: string; name: string; grade: string }
 interface Props {
   examId: string;
   examTitle: string;
+  examToken?: string;
   classrooms: Classroom[];
   onClose: () => void;
 }
 
-export default function QRModal({ examId, examTitle, classrooms, onClose }: Props) {
+export default function QRModal({ examId, examTitle, examToken, classrooms, onClose }: Props) {
   const [selected, setSelected] = useState<Classroom | null>(classrooms[0] ?? null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  const examUrl = selected
-    ? `${baseUrl}/exam/${examId}?cls=${selected.id}`
-    : "";
+  const shortCode = examToken || examId;
+  const shortUrl = selected
+    ? `${baseUrl}/s/${shortCode}?cls=${selected.id}`
+    : `${baseUrl}/s/${shortCode}`;
 
-  const copy = () => {
-    navigator.clipboard.writeText(examUrl);
-    toast.success("คัดลอกลิงค์แล้ว!");
+  const cleanShortUrl = `${baseUrl}/s/${shortCode}`;
+
+  const copyShortUrl = () => {
+    navigator.clipboard.writeText(shortUrl);
+    window.alert(`คัดลอกลิงก์แล้ว:\n${shortUrl}`);
+  };
+
+  const copyPin = () => {
+    if (!examToken) return;
+    navigator.clipboard.writeText(examToken);
+    window.alert(`คัดลอกรหัสเข้าสอบ (PIN): ${examToken} แล้ว`);
   };
 
   const downloadQR = () => {
@@ -49,7 +59,7 @@ export default function QRModal({ examId, examTitle, classrooms, onClose }: Prop
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-slide-up">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-slide-up max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <div className="flex items-center gap-3">
@@ -57,7 +67,7 @@ export default function QRModal({ examId, examTitle, classrooms, onClose }: Prop
               <QrCode className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-800">QR Code / ลิงค์เข้าสอบ</h2>
+              <h2 className="font-bold text-slate-800">QR Code / รหัสเข้าสอบ</h2>
               <p className="text-xs text-slate-400">{examTitle}</p>
             </div>
           </div>
@@ -66,8 +76,29 @@ export default function QRModal({ examId, examTitle, classrooms, onClose }: Prop
           </button>
         </div>
 
+        {/* PIN banner */}
+        {examToken && (
+          <div className="mx-6 mt-4 p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                <KeyRound className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 font-medium">รหัสข้อสอบ (PIN 6 หลัก พิมพ์ง่าย)</p>
+                <p className="text-xl font-black font-mono tracking-wider text-blue-700">{examToken}</p>
+              </div>
+            </div>
+            <button
+              onClick={copyPin}
+              className="text-xs font-semibold px-3 py-1.5 bg-white border border-blue-200 rounded-xl text-blue-700 hover:bg-blue-50 shadow-sm transition-all"
+            >
+              คัดลอก PIN
+            </button>
+          </div>
+        )}
+
         {/* Classroom selector */}
-        <div className="px-6 pt-5">
+        <div className="px-6 pt-4">
           <label className="label">เลือกห้องเรียน</label>
           <div className="flex flex-wrap gap-2">
             {classrooms.map((cls) => (
@@ -85,42 +116,51 @@ export default function QRModal({ examId, examTitle, classrooms, onClose }: Prop
 
         {/* QR Code */}
         {selected && (
-          <div className="px-6 py-5 flex flex-col items-center">
-            <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-200 mb-4">
+          <div className="px-6 py-4 flex flex-col items-center">
+            <div className="bg-white p-3.5 rounded-2xl shadow-inner border border-slate-200 mb-3">
               <QRCodeSVG
                 id="qr-svg"
-                value={examUrl}
-                size={220}
+                value={shortUrl}
+                size={210}
                 level="H"
                 includeMargin
                 imageSettings={{
                   src: SCHOOL_LOGO_BASE64,
-                  width: 48,
-                  height: 48,
+                  width: 46,
+                  height: 46,
                   excavate: true,
                 }}
               />
             </div>
-            <p className="text-sm font-semibold text-slate-600 mb-1">
+            <p className="text-sm font-semibold text-slate-700 mb-0.5">
               ห้อง {selected.grade} {selected.name}
             </p>
-            <p className="text-xs text-slate-400 mb-4 text-center break-all">{examUrl}</p>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 mb-4 text-center max-w-full">
+              <p className="text-xs text-slate-500 font-mono break-all font-semibold select-all">
+                {shortUrl}
+              </p>
+            </div>
 
             {/* Actions */}
-            <div className="flex gap-3 w-full">
-              <button onClick={copy}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-xl transition-colors text-sm">
-                <Copy className="w-4 h-4" /> คัดลอกลิงค์
+            <div className="flex gap-2.5 w-full">
+              <button onClick={copyShortUrl}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl transition-colors text-xs sm:text-sm">
+                <Copy className="w-4 h-4" /> คัดลอกลิงก์
               </button>
               <button onClick={downloadQR}
-                className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm">
+                className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-xs sm:text-sm">
                 <Download className="w-4 h-4" /> ดาวน์โหลด QR
               </button>
-              <a href={examUrl} target="_blank" rel="noreferrer"
-                className="flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-700 px-3 py-3 rounded-xl transition-colors">
+              <a href={shortUrl} target="_blank" rel="noreferrer"
+                className="flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-700 px-3 py-2.5 rounded-xl transition-colors"
+                title="เปิดลิงก์เข้าสอบ">
                 <ExternalLink className="w-4 h-4" />
               </a>
             </div>
+
+            <p className="text-[11px] text-slate-400 mt-3 text-center">
+              💡 นักเรียนสามารถสแกน QR Code หรือเปิดเว็บแล้วกรอกรหัส PIN: <strong>{examToken}</strong> ได้เลย
+            </p>
           </div>
         )}
       </div>
