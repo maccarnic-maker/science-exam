@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Camera, X, Loader2 } from "lucide-react";
-import Image from "next/image";
+import { compressImage } from "@/lib/image-compressor";
 
 interface Props {
   value?: string | null;
@@ -15,21 +15,29 @@ export default function ImageUpload({ value, onChange, label = "เพิ่ม�
   const [uploading, setUploading] = useState(false);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
     setUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
 
-    const res = await fetch("/api/upload", { method: "POST", body: fd });
-    setUploading(false);
+    try {
+      // ลดขนาดรูปภาพลงอัตโนมัติก่อนอัปโหลดเข้า Cloudflare R2
+      const compressedFile = await compressImage(rawFile, 1280, 1280, 0.8);
 
-    if (res.ok) {
-      const data = (await res.json()) as any;
-      onChange(data.url);
+      const fd = new FormData();
+      fd.append("file", compressedFile);
+
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        onChange(data.url);
+      }
+    } catch {
+      // fallback
+    } finally {
+      setUploading(false);
+      e.target.value = "";
     }
-    e.target.value = "";
   };
 
   const btnClass = size === "sm"
@@ -39,8 +47,8 @@ export default function ImageUpload({ value, onChange, label = "เพิ่ม�
   if (value) {
     return (
       <div className="relative inline-block group">
-        <div className={`relative overflow-hidden rounded-xl border-2 border-slate-200 ${size === "sm" ? "w-24 h-20" : "w-40 h-32"}`}>
-          <Image src={value} alt="รูปภาพ" fill className="object-cover" />
+        <div className={`relative overflow-hidden rounded-xl border-2 border-slate-200 bg-slate-50 flex items-center justify-center ${size === "sm" ? "w-24 h-20" : "w-40 h-32"}`}>
+          <img src={value} alt="รูปภาพ" className="w-full h-full object-cover" />
         </div>
         <button
           type="button"

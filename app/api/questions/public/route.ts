@@ -73,8 +73,11 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    // สุ่มลำดับข้อสอบ (Questions Shuffle)
-    const shuffledQuestions = shuffleArray(rawList);
+    // สุ่มลำดับข้อสอบ (Questions Shuffle) แต่เรียงเลขข้อ 1, 2, 3, 4, 5... ให้เป็นลำดับเสมอ
+    const shuffledQuestions = shuffleArray(rawList).map((q, idx) => ({
+      ...q,
+      order_num: idx + 1,
+    }));
 
     return NextResponse.json({
       session_id: sessionId,
