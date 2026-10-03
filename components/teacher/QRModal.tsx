@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { X, Copy, Download, QrCode, ExternalLink } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import toast from "react-hot-toast";
+import { SCHOOL_LOGO_BASE64 } from "@/lib/school-logo";
 
 interface Classroom { id: string; name: string; grade: string }
 
@@ -40,10 +41,10 @@ export default function QRModal({ examId, examTitle, classrooms, onClose }: Prop
       ctx.drawImage(img, 0, 0, 400, 400);
       const link = document.createElement("a");
       link.download = `qr-${selected?.name ?? "exam"}.png`;
-      link.href = canvas.toDataURL();
+      link.href = canvas.toDataURL("image/png");
       link.click();
     };
-    img.src = `data:image/svg+xml;base64,${btoa(svgData)}`;
+    img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgData)))}`;
   };
 
   return (
@@ -89,13 +90,13 @@ export default function QRModal({ examId, examTitle, classrooms, onClose }: Prop
               <QRCodeSVG
                 id="qr-svg"
                 value={examUrl}
-                size={200}
+                size={220}
                 level="H"
                 includeMargin
                 imageSettings={{
-                  src: "/favicon.ico",
-                  width: 32,
-                  height: 32,
+                  src: SCHOOL_LOGO_BASE64,
+                  width: 48,
+                  height: 48,
                   excavate: true,
                 }}
               />
