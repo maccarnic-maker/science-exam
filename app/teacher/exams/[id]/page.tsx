@@ -564,7 +564,6 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
                 <div className="offline-exam-print-choices">
                   {question.choices.map((choice, choiceIndex) => (
                     <div className="offline-exam-print-choice" key={choice.id}>
-                      <span className="offline-exam-print-checkbox">□</span>
                       <span className="offline-exam-print-choice-label">{LABELS[choiceIndex] ?? choiceIndex + 1}.</span>
                       <span>{choice.choice_text}</span>
                       {choice.choice_image && (
