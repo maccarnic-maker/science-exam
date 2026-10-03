@@ -59,3 +59,130 @@
   background: rgba(255,255,255,0.85);
   border: 1px solid rgba(255,255,255,0.6);
 }
+
+/* Offline exam paper. Keep it out of the normal teacher screen and show it only when printing. */
+.offline-exam-print {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .exam-page-content {
+    display: none !important;
+  }
+
+  .offline-exam-print {
+    display: block !important;
+    color: #111827;
+    font-family: 'Noto Sans Thai', 'Sarabun', Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+
+  .offline-exam-print-header {
+    text-align: center;
+    border-bottom: 1px solid #9ca3af;
+    padding-bottom: 10pt;
+    margin-bottom: 10pt;
+  }
+
+  .offline-exam-print-header h1 {
+    font-size: 16pt;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .offline-exam-print-header p,
+  .offline-exam-print-header h2 {
+    margin: 2pt 0 0;
+  }
+
+  .offline-exam-print-header h2 {
+    font-size: 14pt;
+    font-weight: 700;
+  }
+
+  .offline-exam-print-meta {
+    font-size: 10pt;
+  }
+
+  .offline-exam-print-student-fields {
+    display: flex;
+    gap: 16pt;
+    flex-wrap: wrap;
+    margin-bottom: 9pt;
+  }
+
+  .offline-exam-print-instructions {
+    border: 1px solid #9ca3af;
+    padding: 6pt 8pt;
+    margin-bottom: 12pt;
+  }
+
+  .offline-exam-print-question {
+    break-inside: avoid;
+    margin-bottom: 10pt;
+  }
+
+  .offline-exam-print-question-text {
+    display: flex;
+    gap: 5pt;
+    font-weight: 600;
+  }
+
+  .offline-exam-print-number {
+    flex: 0 0 auto;
+  }
+
+  .offline-exam-print-question-image {
+    display: block;
+    max-width: 82mm;
+    max-height: 55mm;
+    object-fit: contain;
+    margin: 5pt 0 5pt 16pt;
+  }
+
+  .offline-exam-print-choices {
+    margin: 4pt 0 0 16pt;
+  }
+
+  .offline-exam-print-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 4pt;
+    margin: 2pt 0;
+  }
+
+  .offline-exam-print-checkbox {
+    font-size: 12pt;
+    line-height: 1.2;
+  }
+
+  .offline-exam-print-choice-label {
+    flex: 0 0 14pt;
+  }
+
+  .offline-exam-print-choice-image {
+    max-width: 35mm;
+    max-height: 20mm;
+    object-fit: contain;
+    margin-left: 4pt;
+  }
+
+  .offline-exam-print-footer {
+    border-top: 1px solid #9ca3af;
+    margin-top: 14pt;
+    padding-top: 7pt;
+    text-align: center;
+    font-weight: 700;
+  }
+}
