@@ -29,10 +29,7 @@ export default function TeacherNav({ user }: Props) {
             <Microscope className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-slate-800 text-base">Science Exam</span>
-              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">v1.0.4</span>
-            </div>
+            <span className="font-extrabold text-slate-800 text-base">Science Exam</span>
             <p className="text-[11px] text-slate-400 font-normal leading-tight">รร.บ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
           </div>
         </Link>

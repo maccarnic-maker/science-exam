@@ -47,12 +47,7 @@ export default function TeacherDashboard() {
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-slate-800">แดชบอร์ด 👩‍🏫</h1>
-            <span className="bg-blue-600 text-white font-mono text-xs px-2.5 py-1 rounded-full shadow-sm font-bold">
-              v1.0.4 (Git Auto Deploy)
-            </span>
-          </div>
+          <h1 className="text-3xl font-bold text-slate-800">แดชบอร์ด 👩‍🏫</h1>
           <p className="text-slate-500 mt-1">ระบบสอบวิชาวิทยาศาสตร์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
         </div>
       </div>
