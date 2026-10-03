@@ -14,7 +14,7 @@ export default function NewExamPage() {
     title: "",
     description: "",
     subject: "วิทยาศาสตร์",
-    time_limit: 60,
+    time_limit: "60" as string | number,
   });
   const [classrooms, setClassrooms] = useState<Classroom[]>([{ name: "ห้อง 1", grade: "ป.6" }]);
 
@@ -30,11 +30,16 @@ export default function NewExamPage() {
     if (!form.title.trim()) return toast.error("กรุณาใส่ชื่อข้อสอบ");
     if (!classrooms.length) return toast.error("กรุณาเพิ่มห้องเรียนอย่างน้อย 1 ห้อง");
 
+    const timeLimitNum = parseInt(String(form.time_limit), 10);
+    if (isNaN(timeLimitNum) || timeLimitNum < 1) {
+      return toast.error("กรุณาระบุเวลาสอบให้ถูกต้อง (อย่างน้อย 1 นาที)");
+    }
+
     setLoading(true);
     const res = await fetch("/api/exams", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, classrooms }),
+      body: JSON.stringify({ ...form, time_limit: timeLimitNum, classrooms }),
     });
     setLoading(false);
 
@@ -80,8 +85,8 @@ export default function NewExamPage() {
             </div>
             <div>
               <label className="label">เวลาสอบ (นาที)</label>
-              <input type="number" min={5} max={300} className="input-field" value={form.time_limit}
-                onChange={(e) => setForm((p) => ({ ...p, time_limit: +e.target.value }))} />
+              <input type="number" min={1} max={300} className="input-field" value={form.time_limit}
+                onChange={(e) => setForm((p) => ({ ...p, time_limit: e.target.value }))} placeholder="นาที" />
             </div>
           </div>
         </div>

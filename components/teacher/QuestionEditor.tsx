@@ -120,8 +120,11 @@ export default function QuestionEditor({ examId, question, onSaved, onCancel }: 
 
       <div className="mb-4">
         <label className="label">คะแนน</label>
-        <input type="number" min={1} max={100} className="input-field w-24" value={q.points}
-          onChange={(e) => setQ((p) => ({ ...p, points: +e.target.value }))} />
+        <input type="number" min={1} max={100} className="input-field w-24" value={q.points === 0 ? "" : q.points}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQ((p) => ({ ...p, points: val === "" ? 0 : parseInt(val, 10) || 0 }));
+          }} placeholder="1" />
       </div>
 
       {/* Choices */}
