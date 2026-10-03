@@ -34,8 +34,8 @@ function LoginContent() {
       <div className="glass rounded-3xl shadow-2xl p-10 w-full max-w-md animate-fade-in relative z-10">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg mb-4">
-            <span className="text-4xl">🔬</span>
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-4 p-2">
+            <img src="/school-logo-qr.png" alt="ตราโรงเรียนบ้านครัว" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">ระบบสอบออนไลน์</h1>
           <p className="text-slate-500 text-sm mt-1 text-center font-medium">โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
