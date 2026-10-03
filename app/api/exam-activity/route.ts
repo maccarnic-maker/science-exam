@@ -14,19 +14,8 @@ export async function POST(req: NextRequest) {
 
     if (!session_id) return NextResponse.json({ error: "Missing session_id" }, { status: 400 });
 
-    if (event_type === "tab_switch") {
-      await db
-        .prepare("UPDATE exam_sessions SET tab_switches = tab_switches + 1, last_active_at = unixepoch() WHERE id = ?")
-        .bind(session_id)
-        .run();
-    } else if (event_type === "heartbeat") {
-      await db
-        .prepare("UPDATE exam_sessions SET last_active_at = unixepoch() WHERE id = ?")
-        .bind(session_id)
-        .run();
-    }
-
-    // Check if session was deleted / kicked by teacher
+    // Read status before recording anything. Completed sessions must be
+    // immutable: delayed blur/heartbeat requests must not add activity.
     const current = await db
       .prepare("SELECT id, status FROM exam_sessions WHERE id = ?")
       .bind(session_id)
@@ -34,6 +23,10 @@ export async function POST(req: NextRequest) {
 
     if (!current) {
       return NextResponse.json({ kicked: true, message: "คุณถูกครูผู้คุมสอบนำออกจากห้องสอบ" }, { status: 403 });
+    }
+
+    if (current.status === "completed") {
+      return NextResponse.json({ success: true, status: "completed", recording: false });
     }
 
     if (current.status === "reshuffle") {
@@ -46,7 +39,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reshuffle: true, status: "in_progress" });
     }
 
-    return NextResponse.json({ success: true, status: current.status });
+    if (event_type === "tab_switch") {
+      // The status condition closes the race where submission completes after
+      // the initial read but before this update.
+      await db
+        .prepare("UPDATE exam_sessions SET tab_switches = tab_switches + 1, last_active_at = unixepoch() WHERE id = ? AND status = 'in_progress'")
+        .bind(session_id)
+        .run();
+    } else if (event_type === "heartbeat") {
+      await db
+        .prepare("UPDATE exam_sessions SET last_active_at = unixepoch() WHERE id = ? AND status = 'in_progress'")
+        .bind(session_id)
+        .run();
+    } else {
+      return NextResponse.json({ error: "Invalid event_type" }, { status: 400 });
+    }
+
+    const latest = await db
+      .prepare("SELECT status FROM exam_sessions WHERE id = ?")
+      .bind(session_id)
+      .first<{ status: string }>();
+
+    return NextResponse.json({ success: true, status: latest?.status ?? current.status, recording: latest?.status !== "completed" });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

@@ -5,53 +5,130 @@ import { generateId } from "@/lib/utils";
 import { getTeacherSession } from "@/lib/auth-edge";
 import { getDB } from "@/lib/cloudflare";
 
+interface ResultAnswer {
+  question_id: string;
+  choice_id: string;
+}
+
 // POST /api/results – นักเรียนส่งคำตอบ
 export async function POST(req: NextRequest) {
   const db = getDB(req);
   if (!db) return NextResponse.json({ error: "DB not available" }, { status: 500 });
 
-  const body = (await req.json()) as any;
+  const body = (await req.json()) as {
+    session_id?: string;
+    exam_id?: string;
+    classroom_id?: string;
+    student_name?: string;
+    student_number?: string;
+    answers?: unknown;
+  };
   const { session_id, exam_id, classroom_id, student_name, student_number, answers } = body;
 
   if (!exam_id || !classroom_id || !student_name || !student_number)
     return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
 
   let actualSessionId = session_id;
+  let sessionStartedAt = Math.floor(Date.now() / 1000);
 
   try {
     if (actualSessionId) {
       // ตรวจสอบว่า session ยังอยู่หรือไม่
       const existing = await db
-        .prepare("SELECT id FROM exam_sessions WHERE id = ?")
+        .prepare("SELECT id, exam_id, started_at, status FROM exam_sessions WHERE id = ?")
         .bind(actualSessionId)
-        .first<{ id: string }>();
+        .first<{ id: string; exam_id: string; started_at: number; status: string }>();
 
       if (!existing) {
         return NextResponse.json({ error: "รอบสอบของคุณถูกยกเลิกแล้ว" }, { status: 403 });
       }
+      if (existing.exam_id !== exam_id) {
+        return NextResponse.json({ error: "ข้อมูลรอบสอบไม่ตรงกัน" }, { status: 403 });
+      }
+      if (existing.status === "completed") {
+        return NextResponse.json({ error: "ข้อสอบชุดนี้ถูกส่งไปแล้ว" }, { status: 409 });
+      }
+      sessionStartedAt = existing.started_at;
     } else {
       actualSessionId = generateId();
+    }
+
+    const exam = await db
+      .prepare("SELECT time_limit FROM exams WHERE id = ?")
+      .bind(exam_id)
+      .first<{ time_limit: number }>();
+    if (!exam) return NextResponse.json({ error: "ไม่พบข้อสอบ" }, { status: 404 });
+
+    const questionRows = await db
+      .prepare("SELECT id, points FROM questions WHERE exam_id = ? ORDER BY order_num")
+      .bind(exam_id)
+      .all<{ id: string; points: number }>();
+    const examQuestions = questionRows.results ?? [];
+    const questionMap = new Map(examQuestions.map((question) => [question.id, question]));
+    const submittedAnswers = Array.isArray(answers) ? answers : [];
+    const normalizedAnswers: ResultAnswer[] = [];
+    const seenQuestionIds = new Set<string>();
+
+    for (const answer of submittedAnswers) {
+      if (!answer || typeof answer !== "object") {
+        return NextResponse.json({ error: "รูปแบบคำตอบไม่ถูกต้อง" }, { status: 400 });
+      }
+      const candidate = answer as Partial<ResultAnswer>;
+      if (!candidate.question_id || !candidate.choice_id || typeof candidate.question_id !== "string" || typeof candidate.choice_id !== "string") {
+        return NextResponse.json({ error: "ข้อมูลคำตอบไม่ครบ" }, { status: 400 });
+      }
+      if (!questionMap.has(candidate.question_id)) {
+        return NextResponse.json({ error: "พบคำตอบของข้อสอบที่ไม่อยู่ในชุดนี้" }, { status: 400 });
+      }
+      if (seenQuestionIds.has(candidate.question_id)) {
+        return NextResponse.json({ error: "พบคำตอบซ้ำในข้อสอบเดียวกัน" }, { status: 400 });
+      }
+
+      const choice = await db
+        .prepare("SELECT question_id, is_correct FROM choices WHERE id = ?")
+        .bind(candidate.choice_id)
+        .first<{ question_id: string; is_correct: number }>();
+      if (!choice || choice.question_id !== candidate.question_id) {
+        return NextResponse.json({ error: "ตัวเลือกคำตอบไม่ตรงกับข้อสอบ" }, { status: 400 });
+      }
+
+      seenQuestionIds.add(candidate.question_id);
+      normalizedAnswers.push({ question_id: candidate.question_id, choice_id: candidate.choice_id });
+    }
+
+    const missingQuestionIds = examQuestions
+      .map((question) => question.id)
+      .filter((questionId) => !seenQuestionIds.has(questionId));
+    const now = Math.floor(Date.now() / 1000);
+    const timeExpired = now >= sessionStartedAt + Math.max(0, exam.time_limit) * 60;
+    if (missingQuestionIds.length > 0 && !timeExpired) {
+      return NextResponse.json({
+        error: `กรุณาตอบข้อสอบให้ครบทุกข้อก่อนส่ง (ยังเหลือ ${missingQuestionIds.length} ข้อ)`,
+        missing_count: missingQuestionIds.length,
+      }, { status: 400 });
+    }
+
+    if (!session_id) {
       await db
-        .prepare("INSERT INTO exam_sessions (id, exam_id, classroom_id, student_name, student_number, started_at, last_active_at, status) VALUES (?,?,?,?,?,unixepoch(),unixepoch(),'in_progress')")
-        .bind(actualSessionId, exam_id, classroom_id, student_name.trim(), student_number.trim())
+        .prepare("INSERT INTO exam_sessions (id, exam_id, classroom_id, student_name, student_number, started_at, last_active_at, status) VALUES (?,?,?,?,?, ?, ?, 'in_progress')")
+        .bind(actualSessionId, exam_id, classroom_id, student_name.trim(), student_number.trim(), sessionStartedAt, sessionStartedAt)
         .run();
     }
 
     let score = 0;
-    let total = 0;
+    const total = examQuestions.reduce((sum, question) => sum + (question.points ?? 0), 0);
 
     // ล้างคำตอบเดิมหากมี
     await db.prepare("DELETE FROM student_answers WHERE session_id = ?").bind(actualSessionId).run();
 
-    for (const ans of (answers ?? []) as { question_id: string; choice_id: string }[]) {
+    for (const ans of normalizedAnswers) {
       const correct = await db
-        .prepare("SELECT is_correct, (SELECT points FROM questions WHERE id = ?) as pts FROM choices WHERE id = ?")
-        .bind(ans.question_id, ans.choice_id)
-        .first<{ is_correct: number; pts: number }>();
+        .prepare("SELECT is_correct FROM choices WHERE id = ? AND question_id = ?")
+        .bind(ans.choice_id, ans.question_id)
+        .first<{ is_correct: number }>();
 
       const isCorrect = correct?.is_correct === 1;
-      const pts = correct?.pts ?? 1;
-      total += pts;
+      const pts = questionMap.get(ans.question_id)?.points ?? 0;
       if (isCorrect) score += pts;
 
       await db

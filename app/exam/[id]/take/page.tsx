@@ -30,6 +30,8 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
   const sessionIdRef = useRef<string | null>(null);
   const studentInfo = useRef<StudentInfo | null>(null);
   const timeLimitRef = useRef(60);
+  const submissionStartedRef = useRef(false);
+  const hiddenStateReportedRef = useRef(false);
 
   // 1. Initial Load & Fetch Questions with Shuffling
   useEffect(() => {
@@ -106,51 +108,54 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     });
   }, [params.id]);
 
-  // 2. Anti-Cheat: Detect Tab Switch / App Blur / Window Minimize & Real-time commands
+  // 2. Anti-Cheat: Detect hidden document transitions & real-time commands
   useEffect(() => {
     if (loading || submitted || kicked) return;
 
     const reportTabSwitch = async () => {
+      if (submissionStartedRef.current || !sessionIdRef.current) return;
+
       setTabSwitchCount((prev) => {
         const next = prev + 1;
         setShowWarningModal(true);
         return next;
       });
 
-      if (sessionIdRef.current) {
-        try {
-          const res = await fetch("/api/exam-activity", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ session_id: sessionIdRef.current, event_type: "tab_switch" }),
-          });
-          const data = (await res.json()) as { kicked?: boolean; reshuffle?: boolean; message?: string };
-          if (data.kicked) {
-            setKicked(data.message ?? "คุณถูกครูผู้คุมสอบนำออกจากห้องสอบ");
-          } else if (data.reshuffle) {
-            reloadShuffledQuestions();
-          }
-        } catch {
-          // ignore network error
+      try {
+        const res = await fetch("/api/exam-activity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionIdRef.current, event_type: "tab_switch" }),
+        });
+        const data = (await res.json()) as { kicked?: boolean; reshuffle?: boolean; message?: string };
+        if (data.kicked) {
+          setKicked(data.message ?? "คุณถูกครูผู้คุมสอบนำออกจากห้องสอบ");
+        } else if (data.reshuffle) {
+          reloadShuffledQuestions();
         }
+      } catch {
+        // ignore network error
       }
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.visibilityState === "hidden") {
+        // A tab switch can emit both blur and visibilitychange. Only count the
+        // transition into the hidden state, so one switch is recorded once.
+        if (hiddenStateReportedRef.current) return;
+        hiddenStateReportedRef.current = true;
         reportTabSwitch();
+      } else {
+        hiddenStateReportedRef.current = false;
       }
     };
 
-    const handleWindowBlur = () => {
-      reportTabSwitch();
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleWindowBlur);
 
     // Heartbeat every 3 seconds to keep live presence & check kick/reshuffle status
     const heartbeatTimer = setInterval(async () => {
+      if (submissionStartedRef.current || !sessionIdRef.current) return;
+
       if (sessionIdRef.current) {
         try {
           const res = await fetch("/api/exam-activity", {
@@ -172,18 +177,24 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", handleWindowBlur);
       clearInterval(heartbeatTimer);
     };
   }, [loading, submitted, kicked, reloadShuffledQuestions]);
 
   const executeSubmit = useCallback(async () => {
-    if (submitting || submitted || kicked) return;
+    if (submitting || submitted || kicked || submissionStartedRef.current) return;
     setSubmitting(true);
     const info = studentInfo.current;
-    if (!info) return;
+    if (!info || !sessionIdRef.current) {
+      setSubmitting(false);
+      return;
+    }
+
+    // Stop all client-side activity reporting as soon as submission starts.
+    submissionStartedRef.current = true;
 
     const ansArray = Object.entries(answers).map(([question_id, choice_id]) => ({ question_id, choice_id }));
+    let submissionSucceeded = false;
 
     try {
       const res = await fetch("/api/results", {
@@ -203,6 +214,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         const data = (await res.json()) as any;
         setScoreResult(data);
         setSubmitted(true);
+        submissionSucceeded = true;
         sessionStorage.removeItem("student_info");
       } else {
         const err = (await res.json()) as any;
@@ -227,22 +239,26 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
       });
     } finally {
+      if (!submissionSucceeded) submissionStartedRef.current = false;
       setSubmitting(false);
     }
   }, [answers, params.id, submitting, submitted, kicked]);
 
   const handleManualSubmit = () => {
     const ansCount = Object.keys(answers).length;
-    const unAnswered = questions.length - ansCount;
-    const confirmMsg = unAnswered > 0
-      ? `คุณยังตอบไม่ครบ (ตอบไปแล้ว ${ansCount} จาก ${questions.length} ข้อ)\n\nคุณแน่ใจหรือไม่ว่าต้องการส่งข้อสอบตอนนี้? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`
-      : `คุณตอบข้อสอบครบทั้งหมด ${questions.length} ข้อแล้ว\n\nต้องการยืนยันส่งข้อสอบใช่หรือไม่? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`;
+    if (ansCount !== questions.length) {
+      const firstUnanswered = questions.findIndex((question) => !answers[question.id]);
+      if (firstUnanswered >= 0) setCurrent(firstUnanswered);
+      return;
+    }
+
+    const confirmMsg = `คุณตอบข้อสอบครบทั้งหมด ${questions.length} ข้อแล้ว\n\nต้องการยืนยันส่งข้อสอบใช่หรือไม่? เมื่อส่งแล้วจะไม่สามารถกลับมาแก้ไขได้`;
 
     setModalConfig({
       isOpen: true,
       title: "ยืนยันการส่งข้อสอบ",
       message: confirmMsg,
-      variant: unAnswered > 0 ? "warning" : "info",
+      variant: "info",
       confirmText: "ยืนยันส่งข้อสอบ",
       cancelText: "กลับไปทำต่อ",
       onConfirm: () => {
@@ -275,6 +291,17 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
 
   const answeredCount = Object.keys(answers).length;
   const q = questions[current];
+
+  const goToNextUnanswered = () => {
+    const nextIndex = questions.findIndex((question, index) => index > current && !answers[question.id]);
+    if (nextIndex >= 0) {
+      setCurrent(nextIndex);
+      return;
+    }
+
+    const firstUnanswered = questions.findIndex((question) => !answers[question.id]);
+    if (firstUnanswered >= 0) setCurrent(firstUnanswered);
+  };
 
   // ─── Kicked by teacher screen ─────────────────────────────────────────────
   if (kicked) {
@@ -473,9 +500,9 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
               <ChevronLeft className="w-5 h-5" /> ย้อนกลับ
             </button>
 
-            {current < questions.length - 1 ? (
+            {answeredCount < questions.length ? (
               <button
-                onClick={() => setCurrent((c) => Math.min(questions.length - 1, c + 1))}
+                onClick={goToNextUnanswered}
                 className="btn-primary flex items-center gap-1.5 py-2.5 px-6"
               >
                 ข้อถัดไป <ChevronRight className="w-5 h-5" />
