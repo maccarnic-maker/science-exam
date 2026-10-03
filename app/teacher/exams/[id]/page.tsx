@@ -2,7 +2,7 @@
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer } from "lucide-react";
+import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer, Save } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import QuestionEditor from "@/components/teacher/QuestionEditor";
@@ -42,6 +42,8 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const [editQ, setEditQ] = useState<Question | null>(null);
   const [showQR, setShowQR] = useState(searchParams.get("tab") === "qr");
   const [loading, setLoading] = useState(true);
+  const [timeLimitDraft, setTimeLimitDraft] = useState("");
+  const [savingTimeLimit, setSavingTimeLimit] = useState(false);
   const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
   const [showReportModal, setShowReportModal] = useState(false);
 
@@ -56,6 +58,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
       const exams: Exam[] = await eRes.json();
       const found = exams.find((e) => e.id === id);
       setExam(found ?? null);
+      setTimeLimitDraft(found ? String(found.time_limit) : "");
     }
     if (qRes.ok) {
       setQuestions(await qRes.json());
@@ -97,6 +100,36 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
     if (res.ok) {
       setExam((prev) => prev ? { ...prev, is_active: prev.is_active ? 0 : 1 } : null);
       toast.success(exam.is_active ? "ปิดการสอบแล้ว" : "เปิดการสอบแล้ว");
+    }
+  };
+
+  const saveTimeLimit = async () => {
+    if (!exam) return;
+    const timeLimit = Number(timeLimitDraft);
+    if (!Number.isInteger(timeLimit) || timeLimit < 1 || timeLimit > 300) {
+      toast.error("เวลาสอบต้องเป็นจำนวนเต็มระหว่าง 1 ถึง 300 นาที");
+      return;
+    }
+
+    setSavingTimeLimit(true);
+    try {
+      const res = await fetch("/api/exams", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, time_limit: timeLimit }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        toast.error(err.error ?? "แก้เวลาไม่สำเร็จ");
+        return;
+      }
+      setExam((prev) => prev ? { ...prev, time_limit: timeLimit } : null);
+      setTimeLimitDraft(String(timeLimit));
+      toast.success("แก้เวลาสอบเรียบร้อยแล้ว");
+    } catch {
+      toast.error("ไม่สามารถเชื่อมต่อเพื่อแก้เวลาได้");
+    } finally {
+      setSavingTimeLimit(false);
     }
   };
 
@@ -194,6 +227,28 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
             <p className="text-sm text-slate-400 mt-2">
               {questions.length} ข้อ · {exam.time_limit} นาที · รหัส: <span className="font-mono font-bold text-blue-600">{exam.token}</span>
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label htmlFor="exam-time-limit" className="text-xs font-semibold text-slate-600">แก้เวลาสอบ</label>
+              <input
+                id="exam-time-limit"
+                type="number"
+                min={1}
+                max={300}
+                value={timeLimitDraft}
+                onChange={(e) => setTimeLimitDraft(e.target.value)}
+                className="input-field w-24 py-1.5 text-sm"
+                aria-label="เวลาสอบเป็นนาที"
+              />
+              <span className="text-xs text-slate-400">นาที</span>
+              <button
+                type="button"
+                onClick={saveTimeLimit}
+                disabled={savingTimeLimit}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Save className="w-3.5 h-3.5" /> {savingTimeLimit ? "กำลังบันทึก..." : "บันทึกเวลา"}
+              </button>
+            </div>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setShowQR(true)}
