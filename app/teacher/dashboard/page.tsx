@@ -48,7 +48,7 @@ export default function TeacherDashboard() {
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">แดชบอร์ด 👩‍🏫</h1>
-          <p className="text-slate-500 mt-1">ระบบสอบวิชาวิทยาศาสตร์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
+          <p className="text-slate-500 mt-1">ระบบสอบออนไลน์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
         </div>
       </div>
 

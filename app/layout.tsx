@@ -3,8 +3,8 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "ระบบสอบวิทยาศาสตร์ | โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
-  description: "ระบบสอบออนไลน์วิชาวิทยาศาสตร์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
+  title: "ระบบสอบออนไลน์ | โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
+  description: "ระบบสอบออนไลน์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",

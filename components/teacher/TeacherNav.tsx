@@ -29,7 +29,7 @@ export default function TeacherNav({ user }: Props) {
             <Microscope className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="font-extrabold text-slate-800 text-base">Science Exam</span>
+            <span className="font-extrabold text-slate-800 text-base">ระบบสอบออนไลน์</span>
             <p className="text-[11px] text-slate-400 font-normal leading-tight">รร.บ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
           </div>
         </Link>

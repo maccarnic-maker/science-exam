@@ -37,7 +37,7 @@ function LoginContent() {
           <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg mb-4">
             <span className="text-4xl">🔬</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">ระบบสอบวิทยาศาสตร์</h1>
+          <h1 className="text-2xl font-bold text-slate-800">ระบบสอบออนไลน์</h1>
           <p className="text-slate-500 text-sm mt-1 text-center font-medium">โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
         </div>
 

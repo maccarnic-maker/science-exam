@@ -62,7 +62,7 @@ export default function ExamsListPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">ชุดข้อสอบทั้งหมด 📚</h1>
-          <p className="text-slate-500 mt-1">จัดการชุดข้อสอบวิทยาศาสตร์</p>
+          <p className="text-slate-500 mt-1">จัดการชุดข้อสอบออนไลน์</p>
         </div>
         <Link href="/teacher/exams/new" className="btn-primary flex items-center gap-2">
           <PlusCircle className="w-5 h-5" /> สร้างใหม่
