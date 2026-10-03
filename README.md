@@ -1,6 +1,6 @@
-# 🔬 Science Exam System
-**ระบบสอบวิชาวิทยาศาสตร์ โรงเรียนบ้านกรวย**
-URL: `https://science-exam.bankruaschool.ac.th`
+# 📝 Online Exam System
+**ระบบสอบออนไลน์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)**
+URL: `https://onlinetest.bankruaschool.ac.th`
 
 ---
 
@@ -23,11 +23,11 @@ URL: `https://science-exam.bankruaschool.ac.th`
 
 **Authorized JavaScript origins:**
 ```
-https://science-exam.bankruaschool.ac.th
+https://onlinetest.bankruaschool.ac.th
 ```
 **Authorized redirect URIs:**
 ```
-https://science-exam.bankruaschool.ac.th/api/auth/callback/google
+https://onlinetest.bankruaschool.ac.th/api/auth/google
 ```
 
 ### 2. ตั้งค่า Cloudflare
@@ -65,8 +65,8 @@ npx wrangler pages deploy .vercel/output/static --project-name science-exam
 ```
 
 ### 5. Custom Domain
-ใน Cloudflare Pages Dashboard → Custom domains → เพิ่ม `science-exam.bankruaschool.ac.th`
-แล้วไปที่ DNS ของ domain เพิ่ม CNAME record ตามที่ Cloudflare บอก
+ใน Cloudflare Pages Dashboard → Custom domains → เพิ่ม `onlinetest.bankruaschool.ac.th`
+แล้วไปที่ DNS ของ domain เพิ่ม CNAME record ชี้ไปที่ `science-exam.pages.dev`
 
 ---
 
