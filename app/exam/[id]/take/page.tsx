@@ -31,6 +31,8 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
   const studentInfo = useRef<StudentInfo | null>(null);
   const timeLimitRef = useRef(60);
   const submissionStartedRef = useRef(false);
+  const submittingRef = useRef(false);
+  const submitRetryTimerRef = useRef<number | null>(null);
   const hiddenStateReportedRef = useRef(false);
 
   // 1. Initial Load & Fetch Questions with Shuffling
@@ -181,8 +183,16 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     };
   }, [loading, submitted, kicked, reloadShuffledQuestions]);
 
-  const executeSubmit = useCallback(async () => {
-    if (submitting || submitted || kicked || submissionStartedRef.current) return;
+  useEffect(() => {
+    return () => {
+      if (submitRetryTimerRef.current !== null) {
+        window.clearTimeout(submitRetryTimerRef.current);
+      }
+    };
+  }, []);
+
+  const executeSubmit = useCallback(async (isRetry = false) => {
+    if (submitted || kicked || (!isRetry && (submittingRef.current || submissionStartedRef.current))) return;
     setSubmitting(true);
     const info = studentInfo.current;
     if (!info || !sessionIdRef.current) {
@@ -191,10 +201,12 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     }
 
     // Stop all client-side activity reporting as soon as submission starts.
-    submissionStartedRef.current = true;
+    if (!isRetry) submissionStartedRef.current = true;
+    submittingRef.current = true;
 
     const ansArray = Object.entries(answers).map(([question_id, choice_id]) => ({ question_id, choice_id }));
     let submissionSucceeded = false;
+    let retryScheduled = false;
 
     try {
       const res = await fetch("/api/results", {
@@ -218,6 +230,15 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         sessionStorage.removeItem("student_info");
       } else {
         const err = (await res.json()) as any;
+        if (res.status === 409 && err.code === "SUBMISSION_IN_PROGRESS") {
+          retryScheduled = true;
+          const retryAfter = typeof err.retry_after_ms === "number" ? err.retry_after_ms : 1000;
+          submitRetryTimerRef.current = window.setTimeout(() => {
+            submitRetryTimerRef.current = null;
+            void executeSubmit(true);
+          }, Math.max(500, Math.min(retryAfter, 3000)));
+          return;
+        }
         setModalConfig({
           isOpen: true,
           title: "ส่งข้อสอบไม่สำเร็จ",
@@ -239,10 +260,15 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
       });
     } finally {
-      if (!submissionSucceeded) submissionStartedRef.current = false;
-      setSubmitting(false);
+      if (!submissionSucceeded && !retryScheduled) {
+        submissionStartedRef.current = false;
+      }
+      if (!retryScheduled) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     }
-  }, [answers, params.id, submitting, submitted, kicked]);
+  }, [answers, params.id, submitted, kicked]);
 
   const handleManualSubmit = () => {
     const ansCount = Object.keys(answers).length;
@@ -476,6 +502,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
                 return (
                   <button
                     key={c.id}
+                    disabled={submitting}
                     onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: c.id }))}
                     className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center gap-4 group
                       ${isSelected
@@ -502,7 +529,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
             <button
               onClick={() => setCurrent((c) => Math.max(0, c - 1))}
-              disabled={current === 0}
+              disabled={current === 0 || submitting}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"
             >
               <ChevronLeft className="w-5 h-5" /> ย้อนกลับ
@@ -511,6 +538,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
             {answeredCount < questions.length ? (
               <button
                 onClick={goToNextUnanswered}
+                disabled={submitting}
                 className="btn-primary flex items-center gap-1.5 py-2.5 px-6"
               >
                 ข้อถัดไป <ChevronRight className="w-5 h-5" />
@@ -538,6 +566,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
                 <button
                   key={qu.id}
                   onClick={() => setCurrent(i)}
+                  disabled={submitting}
                   className={`w-9 h-9 rounded-xl font-bold text-sm transition-all
                     ${isCur
                       ? "ring-2 ring-blue-600 bg-blue-600 text-white"

@@ -61,7 +61,15 @@ export async function POST(req: NextRequest) {
         });
       }
       if (existing.status === "submitting") {
-        return NextResponse.json({ error: "ระบบกำลังบันทึกคำตอบของคุณ กรุณารอสักครู่แล้วลองใหม่" }, { status: 409 });
+        return NextResponse.json(
+          {
+            error: "ระบบกำลังบันทึกคำตอบของคุณ",
+            code: "SUBMISSION_IN_PROGRESS",
+            session_id: actualSessionId,
+            retry_after_ms: 1000,
+          },
+          { status: 409, headers: { "Retry-After": "1" } }
+        );
       }
       sessionStartedAt = existing.started_at;
     } else {
@@ -192,7 +200,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ error: "มีคำขอส่งข้อสอบอื่นกำลังดำเนินการ กรุณารอสักครู่แล้วลองใหม่" }, { status: 409 });
+    return NextResponse.json(
+      {
+        error: "ระบบกำลังบันทึกคำตอบของคุณ",
+        code: "SUBMISSION_IN_PROGRESS",
+        session_id: sessionId,
+        retry_after_ms: 1000,
+      },
+      { status: 409, headers: { "Retry-After": "1" } }
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
