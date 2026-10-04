@@ -131,6 +131,7 @@ export default function PinJoinPortal() {
       {/* Footer */}
       <div className="text-center text-xs text-blue-200/80 py-2">
         <p>© 2026 โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์) · สพป.สระบุรี เขต 1</p>
+        <p className="mt-1">ผู้พัฒนา: ธันฐกรณ์ เฉลิมวัฒน์ · maccarnic@gmail.com · โทร. 086-130-6013</p>
       </div>
     </div>
   );
