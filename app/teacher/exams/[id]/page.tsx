@@ -1,6 +1,7 @@
 "use client";
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
+import { printDocument } from '@/lib/print-document';
 import { useSearchParams } from "next/navigation";
 import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer, ClipboardList, Save } from "lucide-react";
 import Link from "next/link";
@@ -141,10 +142,9 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
 
     const printClass = mode === "questions" ? "print-offline-questions" : "print-offline-answers";
     document.body.classList.add(printClass);
-    window.addEventListener("afterprint", () => {
+    printDocument([mode === 'questions' ? 'โจทย์ข้อสอบ' : 'กระดาษคำตอบ', exam?.title ?? 'ชุดข้อสอบ'], () => {
       document.body.classList.remove("print-offline-questions", "print-offline-answers");
-    }, { once: true });
-    window.print();
+    });
   };
 
   const deleteQuestion = (qId: string) => {

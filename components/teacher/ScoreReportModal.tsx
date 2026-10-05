@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { createPortal } from 'react-dom';
+import { printDocument } from '@/lib/print-document';
 import { X, Printer, Download, BookOpen, Users, CheckCircle2, Award } from "lucide-react";
 import Image from "next/image";
 
@@ -81,7 +82,8 @@ export default function ScoreReportModal({
     submittedCount > 0 ? Math.round((passCount / submittedCount) * 100) : 0;
 
   const handlePrint = () => {
-    window.print();
+    const room = selectedClassroom === 'all' ? 'ทุกห้องเรียน' : classrooms.find(c => c.id === selectedClassroom);
+    printDocument(['รายงานผลสอบ', examTitle, typeof room === 'string' ? room : `${room?.grade ?? ''} ${room?.name ?? selectedClassroom}`]);
   };
 
   const handleDownloadCSV = () => {
