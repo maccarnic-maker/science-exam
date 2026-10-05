@@ -37,6 +37,19 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
   const questionsRef = useRef<Question[]>([]);
   const answersRef = useRef<Record<string, string>>({});
   const currentRef = useRef(0);
+  const revisionRef = useRef(0);
+  const progressQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const saveProgress = useCallback((reshuffle = false) => {
+    if (!sessionIdRef.current || submissionStartedRef.current) return Promise.resolve();
+    const payload = { session_id: sessionIdRef.current, revision: revisionRef.current, answers: answersRef.current, current_question: questionsRef.current[currentRef.current]?.id, reshuffle };
+    try { localStorage.setItem(`exam-draft-${payload.session_id}`, JSON.stringify(payload)); } catch { /* Server saving remains available when local storage is blocked. */ }
+    const pending = progressQueueRef.current.catch(() => {}).then(async () => {
+      const res = await fetch('/api/exam-progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), keepalive: true });
+      if (!res.ok) throw new Error('Progress save failed');
+    });
+    progressQueueRef.current = pending;
+    return pending;
+  }, []);
 
   const setCurrentQuestion = useCallback((next: number | ((previous: number) => number)) => {
     const nextIndex = typeof next === "function" ? next(currentRef.current) : next;
@@ -48,7 +61,8 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     const nextAnswers = { ...answersRef.current, [questionId]: choiceId };
     answersRef.current = nextAnswers;
     setAnswers(nextAnswers);
-  }, []);
+    void saveProgress().catch(() => {});
+  }, [saveProgress]);
 
   // 1. Initial Load & Fetch Questions with Shuffling
   useEffect(() => {
@@ -71,20 +85,36 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
 
       if (!eRes.ok || !qRes.ok) { toast.error("ไม่พบข้อสอบหรือการสอบถูกปิด"); return; }
       const exam = (await eRes.json()) as any;
-      const qData = (await qRes.json()) as { session_id?: string; questions?: Question[] };
+      const qData = (await qRes.json()) as { session_id?: string; questions?: Question[]; answers?: Record<string, string>; revision?: number; time_left?: number; tab_switches?: number; status?: string; score?: number; total?: number };
 
       sessionIdRef.current = qData.session_id ?? null;
       timeLimitRef.current = exam.time_limit;
-      setTimeLeft(exam.time_limit * 60);
+      revisionRef.current = qData.revision ?? 0;
+      setTimeLeft(qData.time_left ?? exam.time_limit * 60);
+      setTabSwitchCount(qData.tab_switches ?? 0);
+      if (qData.status === 'completed') {
+        submissionStartedRef.current = true;
+        setSubmitted(true);
+        const total = qData.total ?? 0;
+        setScoreResult({ score: qData.score ?? 0, total, percent: total ? Math.round((qData.score ?? 0) / total * 100) : 0 });
+      }
       const initialQuestions = qData.questions ?? [];
       questionsRef.current = initialQuestions;
-      answersRef.current = {};
-      currentRef.current = 0;
+      let restored = qData.answers ?? {};
+      try {
+        const cached = JSON.parse(localStorage.getItem(`exam-draft-${qData.session_id}`) ?? 'null');
+        if (cached?.revision === revisionRef.current) restored = { ...restored, ...cached.answers };
+      } catch { /* Corrupt local cache must not block server recovery. */ }
+      answersRef.current = restored;
+      setAnswers(restored);
+      currentRef.current = Math.max(0, initialQuestions.findIndex(question => !restored[question.id]));
+      setCurrent(currentRef.current);
       setQuestions(initialQuestions);
+      void saveProgress().catch(() => {});
       setLoading(false);
     };
     load();
-  }, [params.id, router]);
+  }, [params.id, router, saveProgress]);
 
   const reloadShuffledQuestions = useCallback(async (preserveAnswered = false) => {
     const previousQuestions = questionsRef.current;
@@ -100,6 +130,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     });
 
     try {
+      if (preserveAnswered) await saveProgress(true);
       const [eRes, qRes] = await Promise.all([
         fetch(`/api/exam-info?id=${params.id}`),
         fetch(`/api/questions/public?${qParams.toString()}`),
@@ -107,21 +138,14 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
 
       if (eRes.ok && qRes.ok) {
         const exam = (await eRes.json()) as any;
-        const qData = (await qRes.json()) as { session_id?: string; questions?: Question[] };
+        const qData = (await qRes.json()) as { session_id?: string; questions?: Question[]; revision?: number; time_left?: number; tab_switches?: number };
         sessionIdRef.current = qData.session_id ?? sessionIdRef.current;
+        revisionRef.current = qData.revision ?? revisionRef.current;
         timeLimitRef.current = exam.time_limit;
         const freshQuestions = qData.questions ?? [];
 
         if (preserveAnswered && previousQuestions.length === freshQuestions.length) {
-          const unansweredQuestions = freshQuestions.filter((question) => !preservedAnswers[question.id]);
-          let unansweredIndex = 0;
-          const mergedQuestions = previousQuestions.map((previousQuestion, index) => {
-            const question = preservedAnswers[previousQuestion.id]
-              ? previousQuestion
-              : unansweredQuestions[unansweredIndex++] ?? previousQuestion;
-
-            return { ...question, order_num: index + 1 };
-          });
+          const mergedQuestions = freshQuestions;
 
           questionsRef.current = mergedQuestions;
           answersRef.current = preservedAnswers;
@@ -136,7 +160,10 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
           setQuestions(freshQuestions);
           setAnswers({});
           setCurrent(0);
-          setTimeLeft(exam.time_limit * 60);
+          setTimeLeft(qData.time_left ?? exam.time_limit * 60);
+          setTabSwitchCount(qData.tab_switches ?? 0);
+          setShowWarningModal(false);
+          if (sessionIdRef.current) localStorage.removeItem(`exam-draft-${sessionIdRef.current}`);
         }
       }
     } catch {
@@ -156,7 +183,25 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
       confirmText: "รับทราบ และเริ่มทำใหม่",
       onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
     });
-  }, [params.id]);
+  }, [params.id, saveProgress]);
+
+  useEffect(() => {
+    if (loading || submitted || kicked || submitting) return;
+    let active = true;
+    let lock: WakeLockSentinel | null = null;
+    const acquire = async () => {
+      if (!active || document.visibilityState !== 'visible' || !('wakeLock' in navigator) || lock && !lock.released) return;
+      try {
+        const granted = await navigator.wakeLock.request('screen');
+        if (!active) await granted.release();
+        else lock = granted;
+      } catch { /* OS may refuse wake lock in low-power mode. */ }
+    };
+    void acquire();
+    document.addEventListener('visibilitychange', acquire);
+    document.addEventListener('pointerdown', acquire);
+    return () => { active = false; document.removeEventListener('visibilitychange', acquire); document.removeEventListener('pointerdown', acquire); void lock?.release(); };
+  }, [loading, submitted, kicked, submitting]);
 
   // 2. Anti-Cheat: Detect hidden document transitions & real-time commands
   useEffect(() => {
@@ -207,6 +252,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
     // Heartbeat every 3 seconds to keep live presence & check kick/reshuffle status
     const heartbeatTimer = setInterval(async () => {
       if (submissionStartedRef.current || !sessionIdRef.current) return;
+      void saveProgress().catch(() => {});
 
       if (sessionIdRef.current) {
         try {
@@ -264,6 +310,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           session_id: sessionIdRef.current,
+          revision: revisionRef.current,
           exam_id: params.id,
           classroom_id: info.classroom_id,
           student_name: info.name,
@@ -278,6 +325,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
         setSubmitted(true);
         submissionSucceeded = true;
         sessionStorage.removeItem("student_info");
+        if (sessionIdRef.current) localStorage.removeItem(`exam-draft-${sessionIdRef.current}`);
       } else {
         const err = (await res.json()) as any;
         if (res.status === 409 && err.code === "SUBMISSION_IN_PROGRESS") {

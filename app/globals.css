@@ -66,6 +66,20 @@
 }
 
 @media print {
+  body:has(.score-report-shell) > :not(.score-report-shell) { display: none !important; }
+  .score-report-shell, .score-report-dialog, #printable-report {
+    position: static !important;
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .score-report-dialog { max-width: none !important; }
+  #printable-report thead { display: table-header-group; }
+  #printable-report tr, #printable-report > :first-child, #printable-report > :last-child { break-inside: avoid; }
+  #printable-report .overflow-x-auto { overflow: visible !important; }
   @page {
     size: A4;
     margin: 14mm 14mm 16mm;

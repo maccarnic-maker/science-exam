@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     student_name?: string;
     student_number?: string;
     answers?: unknown;
+    revision?: number;
   };
   const { session_id, exam_id, classroom_id, student_name, student_number, answers } = body;
 
@@ -39,15 +40,18 @@ export async function POST(req: NextRequest) {
     if (actualSessionId) {
       // ตรวจสอบว่า session ยังอยู่หรือไม่
       const existing = await db
-        .prepare("SELECT id, exam_id, started_at, status, score, total_points FROM exam_sessions WHERE id = ?")
+        .prepare("SELECT id, exam_id, started_at, status, score, total_points, progress_revision FROM exam_sessions WHERE id = ?")
         .bind(actualSessionId)
-        .first<{ id: string; exam_id: string; started_at: number; status: string; score: number | null; total_points: number | null }>();
+        .first<{ id: string; exam_id: string; started_at: number; status: string; score: number | null; total_points: number | null; progress_revision: number }>();
 
       if (!existing) {
         return NextResponse.json({ error: "รอบสอบของคุณถูกยกเลิกแล้ว" }, { status: 403 });
       }
       if (existing.exam_id !== exam_id) {
         return NextResponse.json({ error: "ข้อมูลรอบสอบไม่ตรงกัน" }, { status: 403 });
+      }
+      if (existing.status === 'reshuffle' || (body.revision !== undefined && body.revision !== existing.progress_revision)) {
+        return NextResponse.json({ error: 'ครูเริ่มรอบสอบใหม่แล้ว กรุณาโหลดข้อสอบใหม่' }, { status: 409 });
       }
       if (existing.status === "completed") {
         const total = existing.total_points ?? 0;
@@ -281,15 +285,11 @@ export async function PUT(req: NextRequest) {
 
   try {
     // 1. ลบคำตอบที่นักเรียนบันทึกไว้
-    await db.prepare("DELETE FROM student_answers WHERE session_id = ?").bind(sessionId).run();
-
     // 2. ปรับสถานะเป็น reshuffle และรีเซ็ตเวลาและคะแนน
-    await db
-      .prepare(
-        "UPDATE exam_sessions SET status = 'reshuffle', score = NULL, total_points = NULL, submitted_at = NULL, started_at = unixepoch(), last_active_at = unixepoch() WHERE id = ?"
-      )
-      .bind(sessionId)
-      .run();
+    await db.batch([
+      db.prepare("DELETE FROM student_answers WHERE session_id = ?").bind(sessionId),
+      db.prepare("UPDATE exam_sessions SET status = 'reshuffle', score = NULL, total_points = NULL, submitted_at = NULL, started_at = unixepoch(), last_active_at = unixepoch(), tab_switches = 0, question_order = NULL, draft_answers = '{}', progress_revision = progress_revision + 1 WHERE id = ?").bind(sessionId),
+    ]);
 
     return NextResponse.json({ success: true, message: "สั่งสุ่มข้อสอบใหม่ให้นักเรียนแล้ว" });
   } catch (err: unknown) {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { createPortal } from 'react-dom';
 import { X, Printer, Download, BookOpen, Users, CheckCircle2, Award } from "lucide-react";
 import Image from "next/image";
 
@@ -94,7 +95,7 @@ export default function ScoreReportModal({
       "คะแนนที่ได้",
       "คะแนนเต็ม",
       "ร้อยละ (%)",
-      "ระดับผลการเรียน (เกรด)",
+      "ระดับคุณภาพ",
       "ผลการประเมิน",
       "สลับหน้าจอ (ครั้ง)",
       "เวลาเริ่มสอบ",
@@ -106,7 +107,7 @@ export default function ScoreReportModal({
       const total = r.total_points ?? totalPossiblePoints;
       const pct = total > 0 ? Math.round(((r.score ?? 0) / total) * 100) : 0;
       const grade =
-        pct >= 80 ? "A" : pct >= 70 ? "B" : pct >= 60 ? "C" : pct >= 50 ? "D" : "F";
+        pct >= 80 ? "ดีเยี่ยม" : pct >= 70 ? "ดี" : pct >= 60 ? "ปานกลาง" : pct >= 50 ? "พอใช้" : "ควรปรับปรุง";
       const statusText = isSub ? (pct >= 50 ? "ผ่าน" : "ไม่ผ่าน") : "ยังไม่ส่ง";
       const startTime = r.started_at
         ? new Date(r.started_at * 1000).toLocaleString("th-TH")
@@ -152,9 +153,9 @@ export default function ScoreReportModal({
     day: "numeric",
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:p-0 print:bg-white">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden print:max-h-none print:shadow-none print:rounded-none print:w-full">
+  return createPortal(
+    <div className="score-report-shell fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:p-0 print:bg-white">
+      <div className="score-report-dialog bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden print:max-h-none print:shadow-none print:rounded-none print:w-full">
         {/* Top Control Bar (Hidden on print) */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 print:hidden">
           <div className="flex items-center gap-2">
@@ -285,7 +286,7 @@ export default function ScoreReportModal({
                     <th className="py-2.5 px-2 text-center w-24">ห้อง</th>
                     <th className="py-2.5 px-2 text-center w-16">คะแนน</th>
                     <th className="py-2.5 px-2 text-center w-16">ร้อยละ</th>
-                    <th className="py-2.5 px-2 text-center w-14">เกรด</th>
+                    <th className="py-2.5 px-2 text-center w-20">ระดับคุณภาพ</th>
                     <th className="py-2.5 px-2 text-center w-20">ผลประเมิน</th>
                     <th className="py-2.5 px-2 text-center w-20 print:hidden">สลับจอ</th>
                   </tr>
@@ -296,7 +297,7 @@ export default function ScoreReportModal({
                     const total = r.total_points ?? totalPossiblePoints;
                     const pct = total > 0 ? Math.round(((r.score ?? 0) / total) * 100) : 0;
                     const grade =
-                      pct >= 80 ? "A" : pct >= 70 ? "B" : pct >= 60 ? "C" : pct >= 50 ? "D" : "F";
+                      pct >= 80 ? "ดีเยี่ยม" : pct >= 70 ? "ดี" : pct >= 60 ? "ปานกลาง" : pct >= 50 ? "พอใช้" : "ควรปรับปรุง";
                     const isPass = pct >= 50;
 
                     return (
@@ -379,6 +380,6 @@ export default function ScoreReportModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
