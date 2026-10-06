@@ -48,16 +48,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 2. Fetch questions
-    const pool = await loadPool(db, examId);
+    let saved = sessionId ? await db.prepare("SELECT question_order, draft_answers, progress_revision, started_at, status, score, total_points, tab_switches FROM exam_sessions WHERE id = ?").bind(sessionId).first<{ question_order: string | null; draft_answers: string; progress_revision: number; started_at: number; status: string; score: number | null; total_points: number | null; tab_switches: number }>() : null;
+    // Resume from the snapshot without redrawing or requiring the live pool.
+    const pool = saved?.question_order ? [] : await loadPool(db, examId);
 
     // สุ่มลำดับข้อสอบ (Questions Shuffle) แต่เรียงเลขข้อ 1, 2, 3, 4, 5... ให้เป็นลำดับเสมอ
-    const shuffledQuestions = drawQuestions(pool, exam.draw_count ?? pool.length).map((q, idx) => ({
+    const shuffledQuestions = (saved?.question_order ? [] : drawQuestions(pool, exam.draw_count ?? pool.length)).map((q, idx) => ({
       ...q,
       order_num: idx + 1,
     }));
 
-    let saved = sessionId ? await db.prepare("SELECT question_order, draft_answers, progress_revision, started_at, status, score, total_points, tab_switches FROM exam_sessions WHERE id = ?").bind(sessionId).first<{ question_order: string | null; draft_answers: string; progress_revision: number; started_at: number; status: string; score: number | null; total_points: number | null; tab_switches: number }>() : null;
     if (sessionId && saved && !saved.question_order) {
       const history = await db.prepare('SELECT seen_questions FROM exam_sessions WHERE id = ?').bind(sessionId).first<{ seen_questions: string }>();
       const selected = drawQuestions(pool, exam.draw_count ?? pool.length, JSON.parse(history?.seen_questions ?? '[]')).map((q, i) => ({ ...q, order_num: i + 1 }));
