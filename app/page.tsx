@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { redirect } from "next/navigation";
 import { getTeacherSession } from "@/lib/auth-edge";

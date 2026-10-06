@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSessionToken, COOKIE_NAME, ALLOWED_TEACHER_EMAIL } from "@/lib/auth-edge";
@@ -23,6 +22,9 @@ export async function GET(req: NextRequest) {
   }
 
   // 2. Initial login trigger -> Redirect to Google
+  if (!clientId || !clientSecret || !process.env.NEXTAUTH_SECRET) {
+    return NextResponse.json({ error: "Authentication is not configured" }, { status: 503 });
+  }
   if (!code) {
     if (!clientId) {
       return NextResponse.json({ error: "Missing GOOGLE_CLIENT_ID" }, { status: 500 });
@@ -87,7 +89,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Create session token
-    const secret = process.env.NEXTAUTH_SECRET || "science-exam-secret";
+    const secret = process.env.NEXTAUTH_SECRET;
     const sessionToken = await createSessionToken(
       { email: userData.email, name: userData.name, image: userData.picture },
       secret

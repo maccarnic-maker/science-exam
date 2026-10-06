@@ -1,5 +1,5 @@
 // lib/cloudflare.ts – Safe Cloudflare bindings getter
-import { getRequestContext } from "@cloudflare/next-on-pages";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextRequest } from "next/server";
 
 export interface D1Database {
@@ -40,12 +40,12 @@ export interface AppEnv {
 
 export function getAppEnv(req?: NextRequest): AppEnv {
   try {
-    const ctx = getRequestContext();
+    const ctx = getCloudflareContext();
     if (ctx?.env) {
       return ctx.env as AppEnv;
     }
   } catch {
-    // fallback if getRequestContext throws in certain environments
+    // Test requests can supply bindings without the Workers runtime.
   }
 
   if (req && (req as unknown as { env?: AppEnv }).env) {

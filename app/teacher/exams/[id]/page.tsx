@@ -1,9 +1,8 @@
 "use client";
-export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { printDocument } from '@/lib/print-document';
 import { shuffle } from '@/lib/question-pool';
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useParams } from "next/navigation";
 import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer, ClipboardList, Save } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -673,7 +672,8 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   );
 }
 
-export default function ExamDetailPageWrapper({ params }: { params: { id: string } }) {
+export default function ExamDetailPageWrapper() {
+  const params = useParams<{ id: string }>();
   return (
     <Suspense fallback={<div className="p-8 text-center text-slate-400">กำลังโหลด...</div>}>
       <ExamDetailContent params={params} />

@@ -1,7 +1,6 @@
 "use client";
-export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { FileCheck2, Clock, BookOpen, User, Hash } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -165,7 +164,8 @@ function StudentRegisterContent({ examId }: { examId: string }) {
   );
 }
 
-export default function ExamStartPage({ params }: { params: { id: string } }) {
+export default function ExamStartPage() {
+  const params = useParams<{ id: string }>();
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700">
       <Suspense>

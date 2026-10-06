@@ -1,7 +1,19 @@
 name = "science-exam"
-compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".vercel/output/static"
+main = ".open-next/worker.js"
+compatibility_date = "2026-10-06"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+workers_dev = true
+
+[vars]
+NEXTAUTH_URL = "https://onlinetest.bankruaschool.ac.th"
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "science-exam"
 
 [[d1_databases]]
 binding = "DB"

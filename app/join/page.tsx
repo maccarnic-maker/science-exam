@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import PinJoinPortal from "@/components/student/PinJoinPortal";
 

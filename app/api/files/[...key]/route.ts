@@ -1,13 +1,12 @@
-export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getR2 } from "@/lib/cloudflare";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { key: string[] } }
+  { params }: { params: Promise<{ key: string[] }> }
 ) {
-  const key = params.key.join("/");
+  const key = (await params).key.join("/");
   const R2 = getR2(req);
 
   if (!R2) {

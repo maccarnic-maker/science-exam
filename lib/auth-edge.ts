@@ -14,10 +14,11 @@ export interface TeacherSession {
 
 // Simple signed HMAC session token compatible with Web Crypto API (supported natively in Cloudflare Workers)
 async function getCryptoKey(secret: string) {
+  if (!secret) throw new Error("Missing session signing secret");
   const enc = new TextEncoder();
   return await crypto.subtle.importKey(
     "raw",
-    enc.encode(secret || "default-secret-change-in-prod-12345"),
+    enc.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"]
@@ -68,14 +69,15 @@ export async function verifySessionToken(token: string, secret: string): Promise
 }
 
 export async function getTeacherSession(req?: NextRequest): Promise<TeacherSession | null> {
-  const secret = process.env.NEXTAUTH_SECRET || "science-exam-secret";
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) return null;
   let token: string | undefined;
 
   if (req) {
     token = req.cookies.get(COOKIE_NAME)?.value;
   } else {
     try {
-      const cookieStore = cookies();
+      const cookieStore = await cookies();
       token = cookieStore.get(COOKIE_NAME)?.value;
     } catch {
       return null;

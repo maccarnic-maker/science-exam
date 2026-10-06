@@ -1,15 +1,16 @@
-export const runtime = 'edge';
 
 import { redirect, notFound } from "next/navigation";
 import { getDB } from "@/lib/cloudflare";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
-  params: { token: string };
-  searchParams: Record<string, string | string[] | undefined>;
+  params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function ShortRedirectPage({ params, searchParams }: Props) {
-  const token = params.token;
+  const { token } = await params;
   const db = getDB();
 
   if (!db) {
@@ -44,7 +45,7 @@ export default async function ShortRedirectPage({ params, searchParams }: Props)
 
   // Preserve query parameters (e.g. cls)
   const qs = new URLSearchParams();
-  for (const [key, value] of Object.entries(searchParams)) {
+  for (const [key, value] of Object.entries(await searchParams)) {
     if (typeof value === "string") {
       qs.set(key, value);
     } else if (Array.isArray(value) && value.length > 0) {

@@ -6,3 +6,6 @@ node_modules/
 dist/
 .vercel/
 .wrangler/
+.open-next/
+.dev.vars
+.dev.vars.*

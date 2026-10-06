@@ -1,5 +1,4 @@
 "use client";
-export const runtime = 'edge';
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BookOpen, Users, CheckCircle, PlusCircle, TrendingUp } from "lucide-react";

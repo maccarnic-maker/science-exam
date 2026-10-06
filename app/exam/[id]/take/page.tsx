@@ -1,7 +1,6 @@
 "use client";
-export const runtime = 'edge';
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, CheckCircle, AlertTriangle, ShieldAlert } from "lucide-react";
 import toast from "react-hot-toast";
 import CustomModal, { ModalConfig } from "@/components/ui/Modal";
@@ -12,7 +11,8 @@ interface StudentInfo { name: string; number: string; classroom_id: string }
 
 const LABELS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
 
-export default function TakeExamPage({ params }: { params: { id: string } }) {
+export default function TakeExamPage() {
+  const params = useParams<{ id: string }>();
   const router = useRouter();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});

@@ -1,8 +1,10 @@
-export const runtime = 'edge';
 
 import { getTeacherSession } from "@/lib/auth-edge";
 import { redirect } from "next/navigation";
 import TeacherNav from "@/components/teacher/TeacherNav";
+
+// Authentication must run per request even when build-time secrets are absent.
+export const dynamic = "force-dynamic";
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const session = await getTeacherSession();
