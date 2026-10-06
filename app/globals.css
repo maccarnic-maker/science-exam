@@ -217,6 +217,9 @@
     padding: 6mm;
     font-size: 10pt;
   }
+  .offline-answer-sheet + .offline-answer-sheet {
+    break-before: page;
+  }
 
   .offline-answer-sheet-header {
     display: flex;

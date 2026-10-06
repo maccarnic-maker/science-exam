@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const exams = await db
-      .prepare("SELECT e.*, COUNT(q.id) as question_count FROM exams e LEFT JOIN questions q ON q.exam_id = e.id GROUP BY e.id ORDER BY e.created_at DESC")
+      .prepare("SELECT e.*, COUNT(DISTINCT q.id) as question_count, GROUP_CONCAT(DISTINCT cls.grade) AS grades FROM exams e LEFT JOIN questions q ON q.exam_id = COALESCE(e.bank_exam_id,e.id) LEFT JOIN classrooms cls ON cls.exam_id = e.id GROUP BY e.id ORDER BY e.created_at DESC")
       .bind()
       .all();
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!db) return NextResponse.json({ error: "DB not available" }, { status: 500 });
 
   const body = (await req.json()) as any;
-  const { title, description, subject, time_limit, classrooms } = body;
+  const { title, description, subject, time_limit, classrooms, bank_exam_id, draw_count } = body;
 
   if (!title || !classrooms?.length)
     return NextResponse.json({ error: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
@@ -42,6 +42,16 @@ export async function POST(req: NextRequest) {
   const token = generateToken();
 
   try {
+    const minutes = Number(time_limit ?? 60);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 300) return NextResponse.json({ error: 'เวลาสอบต้องเป็น 1–300 นาที' }, { status: 400 });
+    let count: number | null = null;
+    if (bank_exam_id) {
+      const bank = await db.prepare('SELECT subject FROM exams WHERE id = ? AND bank_exam_id IS NULL').bind(bank_exam_id).first<{ subject: string }>();
+      const grades = await db.prepare('SELECT DISTINCT grade FROM classrooms WHERE exam_id = ?').bind(bank_exam_id).all<{ grade: string }>();
+      const size = await db.prepare('SELECT COUNT(*) AS count FROM questions WHERE exam_id = ?').bind(bank_exam_id).first<{ count: number }>();
+      count = Number(draw_count ?? 30);
+      if (!bank || bank.subject !== subject || classrooms.some((c: { grade: string }) => !grades.results?.some(g => g.grade === c.grade)) || !Number.isInteger(count) || count < 1 || count > (size?.count ?? 0)) return NextResponse.json({ error: 'คลัง วิชา ชั้น หรือจำนวนข้อไม่ตรงกัน' }, { status: 400 });
+    }
     // Ensure teacher row exists to avoid Foreign Key constraint failure
     await db
       .prepare("INSERT INTO teachers (id, email, name) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING")
@@ -49,8 +59,8 @@ export async function POST(req: NextRequest) {
       .run();
 
     await db
-      .prepare("INSERT INTO exams (id, teacher_id, title, description, subject, time_limit, token) VALUES (?,?,?,?,?,?,?)")
-      .bind(examId, session.email, title, description ?? "", subject ?? "วิทยาศาสตร์", time_limit ?? 60, token)
+      .prepare("INSERT INTO exams (id, teacher_id, title, description, subject, time_limit, token, bank_exam_id, draw_count) VALUES (?,?,?,?,?,?,?,?,?)")
+      .bind(examId, session.email, title, description ?? "", subject ?? "วิทยาศาสตร์", minutes, token, bank_exam_id || null, count)
       .run();
 
     for (const cls of classrooms) {
@@ -78,6 +88,7 @@ export async function PATCH(req: NextRequest) {
     id?: unknown;
     is_active?: unknown;
     time_limit?: unknown;
+    draw_count?: unknown;
   };
 
   if (typeof body.id !== "string" || !body.id.trim()) {
@@ -86,6 +97,13 @@ export async function PATCH(req: NextRequest) {
 
   const updates: string[] = [];
   const values: (string | number)[] = [];
+
+  if (body.draw_count !== undefined) {
+    const count = Number(body.draw_count);
+    const pool = await db.prepare('SELECT COUNT(*) AS count FROM questions WHERE exam_id = (SELECT COALESCE(bank_exam_id,id) FROM exams WHERE id = ?)').bind(body.id.trim()).first<{ count: number }>();
+    if (!Number.isInteger(count) || count < 1 || count > (pool?.count ?? 0)) return NextResponse.json({ error: 'จำนวนข้อที่ใช้สอบต้องอยู่ระหว่าง 1 ถึงจำนวนข้อในคลัง' }, { status: 400 });
+    updates.push('draw_count = ?'); values.push(count);
+  }
 
   if (body.is_active !== undefined) {
     if (typeof body.is_active !== "boolean" && body.is_active !== 0 && body.is_active !== 1) {

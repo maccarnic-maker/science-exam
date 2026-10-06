@@ -523,7 +523,7 @@ export default function TakeExamPage({ params }: { params: { id: string } }) {
               บันทึกการสลับหน้าจอ: {tabSwitchCount} ครั้ง
             </div>
             <p className="text-xs text-slate-500 mb-6">
-              ระบบจะสุ่มข้อที่ยังไม่ได้ตอบใหม่ทันที รวมถึงข้อที่กำลังเปิดอยู่ตอนตรวจพบการสลับจอ ส่วนข้อที่ตอบแล้วจะคงเดิม
+              ระบบจะสุ่มข้อที่ยังไม่ได้ตอบจากคลังใหม่ ส่วนข้อที่ตอบแล้วและข้อที่กำลังเปิดอยู่ตอนตรวจพบการสลับจอจะคงเดิม
             </p>
             <button
               onClick={() => setShowWarningModal(false)}

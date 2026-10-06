@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const questions = await db
-      .prepare("SELECT * FROM questions WHERE exam_id = ? ORDER BY order_num")
+      .prepare("SELECT * FROM questions WHERE exam_id = (SELECT COALESCE(bank_exam_id,id) FROM exams WHERE id = ?) ORDER BY order_num,id")
       .bind(examId)
       .all();
 
@@ -52,6 +52,8 @@ export async function POST(req: NextRequest) {
   const qId = generateId();
 
   try {
+    const linked = await db.prepare('SELECT bank_exam_id FROM exams WHERE id = ?').bind(exam_id).first<{ bank_exam_id: string | null }>();
+    if (linked?.bank_exam_id) return NextResponse.json({ error: 'กรุณาเพิ่มข้อสอบที่คลังต้นทาง' }, { status: 409 });
     await db
       .prepare("INSERT INTO questions (id, exam_id, order_num, question_text, question_image, question_type, points) VALUES (?,?,?,?,?,?,?)")
       .bind(qId, exam_id, order_num ?? 1, question_text, question_image ?? null, question_type ?? "multiple_choice", points ?? 1)
@@ -84,6 +86,8 @@ export async function PUT(req: NextRequest) {
   const { id, question_text, question_image, points, choices } = body;
 
   try {
+    const used = await db.prepare("SELECT id FROM exam_sessions s WHERE EXISTS (SELECT 1 FROM json_each(s.question_order) q WHERE json_extract(q.value,'$.id') = ?) LIMIT 1").bind(id).first();
+    if (used) return NextResponse.json({ error: 'ข้อนี้ถูกใช้ในรอบสอบแล้ว กรุณาเพิ่มข้อใหม่แทนเพื่อรักษาชุดสอบเดิม' }, { status: 409 });
     await db
       .prepare("UPDATE questions SET question_text = ?, question_image = ?, points = ? WHERE id = ?")
       .bind(question_text, question_image ?? null, points ?? 1, id)
@@ -117,6 +121,8 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   try {
+    const used = await db.prepare("SELECT id FROM exam_sessions s WHERE EXISTS (SELECT 1 FROM json_each(s.question_order) q WHERE json_extract(q.value,'$.id') = ?) LIMIT 1").bind(id).first();
+    if (used) return NextResponse.json({ error: 'ไม่สามารถลบข้อที่มีนักเรียนได้รับแล้ว' }, { status: 409 });
     await db.prepare("DELETE FROM questions WHERE id = ?").bind(id).run();
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

@@ -3,16 +3,7 @@ export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/cloudflare";
 import { generateId } from "@/lib/utils";
-
-// Fisher-Yates shuffle helper
-function shuffleArray<T>(array: T[]): T[] {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
+import { loadPool, drawQuestions, publicQuestions } from '@/lib/question-pool';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -28,15 +19,17 @@ export async function GET(req: NextRequest) {
 
   try {
     const exam = await db
-      .prepare("SELECT id, time_limit FROM exams WHERE id = ? AND is_active = 1")
+      .prepare("SELECT id, time_limit, draw_count FROM exams WHERE id = ? AND is_active = 1")
       .bind(examId)
-      .first<{ id: string; time_limit: number }>();
+      .first<{ id: string; time_limit: number; draw_count: number | null }>();
 
     if (!exam) return NextResponse.json({ error: "Exam not available or closed" }, { status: 404 });
 
     // 1. Check or Create session for student to track live behavior
     let sessionId: string | null = null;
     if (classroomId && studentName && studentNumber) {
+      const room = await db.prepare('SELECT id FROM classrooms WHERE id = ? AND exam_id = ?').bind(classroomId, examId).first();
+      if (!room || !studentName.trim() || studentName.length > 200 || studentNumber.length > 30) return NextResponse.json({ error: 'ข้อมูลนักเรียนหรือห้องเรียนไม่ถูกต้อง' }, { status: 400 });
       const existing = await db
         .prepare("SELECT id, status FROM exam_sessions WHERE exam_id = ? AND classroom_id = ? AND student_name = ? AND student_number = ? ORDER BY started_at DESC LIMIT 1")
         .bind(examId, classroomId, studentName.trim().replace(/\s+/g, ' '), studentNumber.trim())
@@ -56,38 +49,26 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Fetch questions
-    const questions = await db
-      .prepare("SELECT id, question_text, question_image, question_type, points, order_num FROM questions WHERE exam_id = ? ORDER BY order_num")
-      .bind(examId)
-      .all();
-
-    const rawList = await Promise.all(
-      ((questions.results ?? []) as { id: string; question_text: string; question_image: string | null; question_type: string; points: number; order_num: number }[]).map(async (q) => {
-        const choices = await db
-          .prepare("SELECT id, choice_text, choice_image, order_num FROM choices WHERE question_id = ? ORDER BY order_num")
-          .bind(q.id)
-          .all();
-        // สุ่มตัวเลือก (Choices Shuffle) สำหรับแต่ละข้อ
-        const shuffledChoices = shuffleArray(choices.results ?? []);
-        return { ...q, choices: shuffledChoices };
-      })
-    );
+    const pool = await loadPool(db, examId);
 
     // สุ่มลำดับข้อสอบ (Questions Shuffle) แต่เรียงเลขข้อ 1, 2, 3, 4, 5... ให้เป็นลำดับเสมอ
-    const shuffledQuestions = shuffleArray(rawList).map((q, idx) => ({
+    const shuffledQuestions = drawQuestions(pool, exam.draw_count ?? pool.length).map((q, idx) => ({
       ...q,
       order_num: idx + 1,
     }));
 
     let saved = sessionId ? await db.prepare("SELECT question_order, draft_answers, progress_revision, started_at, status, score, total_points, tab_switches FROM exam_sessions WHERE id = ?").bind(sessionId).first<{ question_order: string | null; draft_answers: string; progress_revision: number; started_at: number; status: string; score: number | null; total_points: number | null; tab_switches: number }>() : null;
     if (sessionId && saved && !saved.question_order) {
-      await db.prepare("UPDATE exam_sessions SET question_order = ? WHERE id = ? AND question_order IS NULL AND progress_revision = ?")
-        .bind(JSON.stringify(shuffledQuestions), sessionId, saved.progress_revision).run();
+      const history = await db.prepare('SELECT seen_questions FROM exam_sessions WHERE id = ?').bind(sessionId).first<{ seen_questions: string }>();
+      const selected = drawQuestions(pool, exam.draw_count ?? pool.length, JSON.parse(history?.seen_questions ?? '[]')).map((q, i) => ({ ...q, order_num: i + 1 }));
+      const seen = Array.from(new Set([...JSON.parse(history?.seen_questions ?? '[]'), ...selected.map(q => q.id)]));
+      await db.prepare("UPDATE exam_sessions SET question_order = ?, seen_questions = ? WHERE id = ? AND question_order IS NULL AND progress_revision = ?")
+        .bind(JSON.stringify(selected), JSON.stringify(seen), sessionId, saved.progress_revision).run();
       saved = await db.prepare("SELECT question_order, draft_answers, progress_revision, started_at, status, score, total_points, tab_switches FROM exam_sessions WHERE id = ?").bind(sessionId).first<typeof saved>();
     }
     const response = NextResponse.json({
       session_id: sessionId,
-      questions: saved?.question_order ? JSON.parse(saved.question_order) : shuffledQuestions,
+      questions: publicQuestions(saved?.question_order ? JSON.parse(saved.question_order) : shuffledQuestions),
       answers: saved ? JSON.parse(saved.draft_answers) : {},
       revision: saved?.progress_revision ?? 0,
       tab_switches: saved?.tab_switches ?? 0,

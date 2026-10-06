@@ -1,6 +1,6 @@
 "use client";
 export const runtime = 'edge';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PlusCircle, Trash2, BookOpen } from "lucide-react";
 import toast from "react-hot-toast";
@@ -17,6 +17,16 @@ export default function NewExamPage() {
     time_limit: "60" as string | number,
   });
   const [classrooms, setClassrooms] = useState<Classroom[]>([{ name: "ห้อง 1", grade: "ป.6" }]);
+  const [banks, setBanks] = useState<{ id: string; title: string; subject: string; question_count: number; bank_exam_id: string | null; grades: string }[]>([]);
+  const [bankId, setBankId] = useState('');
+  const [drawCount, setDrawCount] = useState('30');
+  useEffect(() => {
+    fetch('/api/exams').then(async response => {
+      if (!response.ok) throw new Error('โหลดคลังไม่สำเร็จ');
+      const data = await response.json() as typeof banks;
+      setBanks(data.filter(bank => !bank.bank_exam_id && bank.question_count > 0));
+    }).catch(() => toast.error('ไม่สามารถโหลดคลังข้อสอบได้'));
+  }, []);
 
   const grades = ["อ.1","อ.2","อ.3","ป.1","ป.2","ป.3","ป.4","ป.5","ป.6","ม.1","ม.2","ม.3","ม.4","ม.5","ม.6"];
 
@@ -39,7 +49,7 @@ export default function NewExamPage() {
     const res = await fetch("/api/exams", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, time_limit: timeLimitNum, classrooms }),
+      body: JSON.stringify({ ...form, time_limit: timeLimitNum, classrooms, bank_exam_id: bankId || null, draw_count: bankId ? Number(drawCount) : null }),
     });
     setLoading(false);
 
@@ -67,6 +77,26 @@ export default function NewExamPage() {
             <BookOpen className="w-5 h-5 text-blue-600" /> ข้อมูลชุดข้อสอบ
           </h2>
 
+          <div>
+            <label className="label">เลือกคลังข้อสอบ</label>
+            <select className="input-field" value={bankId} onChange={event => {
+              const selected = banks.find(bank => bank.id === event.target.value);
+              setBankId(event.target.value);
+              if (selected) {
+                setForm(previous => ({ ...previous, subject: selected.subject }));
+                setClassrooms(previous => previous.map(room => ({ ...room, grade: selected.grades.split(',')[0] })));
+                setDrawCount(String(Math.min(30, selected.question_count)));
+              }
+            }}>
+              <option value="">สร้างชุดว่างเพื่อเพิ่มข้อเอง</option>
+              {banks.map(bank => <option key={bank.id} value={bank.id}>{bank.title} — คลัง {bank.question_count} ข้อ</option>)}
+            </select>
+            {bankId && <div className="mt-3">
+              <label className="label">จำนวนข้อที่สุ่มใช้สอบ</label>
+              <input type="number" min={1} max={banks.find(bank => bank.id === bankId)?.question_count} className="input-field" required value={drawCount} onChange={event => setDrawCount(event.target.value)} />
+              <p className="text-xs text-slate-500 mt-1">สุ่มจากคลังต้นทางทั้งหมด ไม่คัดลอกเฉพาะข้อที่เลือกไว้</p>
+            </div>}
+          </div>
           <div>
             <label className="label">ชื่อชุดข้อสอบ *</label>
             <input className="input-field" placeholder="เช่น สอบกลางภาค วิทย์ ป.6" value={form.title}

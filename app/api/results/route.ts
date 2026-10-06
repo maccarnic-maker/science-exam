@@ -30,13 +30,17 @@ export async function POST(req: NextRequest) {
   };
   const { session_id, exam_id, classroom_id, student_name, student_number, answers } = body;
 
-  if (!exam_id || !classroom_id || !student_name || !student_number)
+  if (!exam_id || !classroom_id || !student_name || !student_number || !Number.isInteger(body.revision))
     return NextResponse.json({ error: "ข้อมูลไม่ครบ" }, { status: 400 });
 
   let actualSessionId = session_id;
   let sessionStartedAt = Math.floor(Date.now() / 1000);
 
   try {
+    if (req.headers.get('origin') !== new URL(req.url).origin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!actualSessionId) return NextResponse.json({ error: 'กรุณาเริ่มรอบสอบก่อนส่งคำตอบ' }, { status: 400 });
+    const permission = await db.prepare('SELECT progress_token FROM exam_sessions WHERE id = ?').bind(actualSessionId).first<{ progress_token: string | null }>();
+    if (!permission?.progress_token || req.cookies.get(`exam_progress_${actualSessionId}`)?.value !== permission.progress_token) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (actualSessionId) {
       // ตรวจสอบว่า session ยังอยู่หรือไม่
       const existing = await db
@@ -86,15 +90,15 @@ export async function POST(req: NextRequest) {
       .first<{ time_limit: number }>();
     if (!exam) return NextResponse.json({ error: "ไม่พบข้อสอบ" }, { status: 404 });
 
-    const questionRows = await db
-      .prepare("SELECT id, points FROM questions WHERE exam_id = ? ORDER BY order_num")
-      .bind(exam_id)
-      .all<{ id: string; points: number }>();
-    const examQuestions = questionRows.results ?? [];
+    const assigned = actualSessionId ? await db.prepare('SELECT question_order FROM exam_sessions WHERE id = ?').bind(actualSessionId).first<{ question_order: string | null }>() : null;
+    if (!assigned?.question_order) return NextResponse.json({ error: 'กรุณาเริ่มรอบสอบก่อนส่งคำตอบ' }, { status: 400 });
+    const examQuestions = JSON.parse(assigned.question_order) as { id: string; points: number; correct_choice_id?: string; choices: { id: string }[] }[];
     const questionMap = new Map(examQuestions.map((question) => [question.id, question]));
     const submittedAnswers = Array.isArray(answers) ? answers : [];
     const normalizedAnswers: ValidatedAnswer[] = [];
     const seenQuestionIds = new Set<string>();
+    const choiceRows = await db.prepare("SELECT id, question_id, is_correct FROM choices WHERE question_id IN (SELECT value FROM json_each(?))").bind(JSON.stringify(examQuestions.map(q => q.id))).all<{ id: string; question_id: string; is_correct: number }>();
+    const choiceMap = new Map((choiceRows.results ?? []).map(choice => [choice.id, choice]));
 
     for (const answer of submittedAnswers) {
       if (!answer || typeof answer !== "object") {
@@ -107,14 +111,12 @@ export async function POST(req: NextRequest) {
       if (!questionMap.has(candidate.question_id)) {
         return NextResponse.json({ error: "พบคำตอบของข้อสอบที่ไม่อยู่ในชุดนี้" }, { status: 400 });
       }
+      if (!questionMap.get(candidate.question_id)?.choices.some(c => c.id === candidate.choice_id)) return NextResponse.json({ error: 'ตัวเลือกไม่อยู่ในชุดที่ได้รับ' }, { status: 400 });
       if (seenQuestionIds.has(candidate.question_id)) {
         return NextResponse.json({ error: "พบคำตอบซ้ำในข้อสอบเดียวกัน" }, { status: 400 });
       }
 
-      const choice = await db
-        .prepare("SELECT question_id, is_correct FROM choices WHERE id = ?")
-        .bind(candidate.choice_id)
-        .first<{ question_id: string; is_correct: number }>();
+      const choice = choiceMap.get(candidate.choice_id);
       if (!choice || choice.question_id !== candidate.question_id) {
         return NextResponse.json({ error: "ตัวเลือกคำตอบไม่ตรงกับข้อสอบ" }, { status: 400 });
       }
@@ -123,7 +125,7 @@ export async function POST(req: NextRequest) {
       normalizedAnswers.push({
         question_id: candidate.question_id,
         choice_id: candidate.choice_id,
-        isCorrect: choice.is_correct === 1 ? 1 : 0,
+        isCorrect: questionMap.get(candidate.question_id)?.correct_choice_id ? (candidate.choice_id === questionMap.get(candidate.question_id)?.correct_choice_id ? 1 : 0) : (choice.is_correct === 1 ? 1 : 0),
       });
     }
 
@@ -161,8 +163,8 @@ export async function POST(req: NextRequest) {
 
     statements.push(
       db
-        .prepare("UPDATE exam_sessions SET status = 'submitting', last_active_at = unixepoch() WHERE id = ? AND status = 'in_progress'")
-        .bind(sessionId),
+        .prepare("UPDATE exam_sessions SET status = 'submitting', last_active_at = unixepoch() WHERE id = ? AND status = 'in_progress' AND progress_revision = ? AND question_order = ?")
+        .bind(sessionId, body.revision, assigned.question_order),
       db
         .prepare("DELETE FROM student_answers WHERE session_id = ? AND EXISTS (SELECT 1 FROM exam_sessions WHERE id = ? AND status = 'submitting')")
         .bind(sessionId, sessionId)
@@ -204,6 +206,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (committed.status !== 'submitting') return NextResponse.json({ error: 'ชุดสอบเปลี่ยนแล้ว กรุณาโหลดข้อสอบใหม่' }, { status: 409 });
     return NextResponse.json(
       {
         error: "ระบบกำลังบันทึกคำตอบของคุณ",

@@ -2,6 +2,7 @@
 export const runtime = 'edge';
 import { useEffect, useState, Suspense } from "react";
 import { printDocument } from '@/lib/print-document';
+import { shuffle } from '@/lib/question-pool';
 import { useSearchParams } from "next/navigation";
 import { PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight, ArrowLeft, BookOpen, Users, AlertTriangle, UserX, RefreshCw, Shuffle, Printer, ClipboardList, Save } from "lucide-react";
 import Link from "next/link";
@@ -14,7 +15,7 @@ import CustomModal, { ModalConfig } from "@/components/ui/Modal";
 interface Choice { id: string; choice_text: string; choice_image?: string; is_correct: number; order_num: number }
 interface Question { id: string; question_text: string; question_image?: string; question_type: string; points: number; order_num: number; choices: Choice[] }
 interface Classroom { id: string; name: string; grade: string }
-interface Exam { id: string; title: string; subject: string; time_limit: number; is_active: number; token: string; description: string }
+interface Exam { id: string; title: string; subject: string; time_limit: number; draw_count: number | null; is_active: number; token: string; description: string }
 interface Result {
   id: string;
   student_name: string;
@@ -37,6 +38,8 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const [exam, setExam] = useState<Exam | null>(null);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [offlineQuestions, setOfflineQuestions] = useState<Question[]>([]);
+  useEffect(() => { setOfflineQuestions(shuffle(questions).slice(0, exam?.draw_count ?? questions.length)); }, [questions, exam?.draw_count]);
   const [results, setResults] = useState<Result[]>([]);
   const [tab, setTab] = useState<(typeof TABS)[number]>("ข้อสอบ");
   const [addingQ, setAddingQ] = useState(false);
@@ -44,6 +47,8 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const [showQR, setShowQR] = useState(searchParams.get("tab") === "qr");
   const [loading, setLoading] = useState(true);
   const [timeLimitDraft, setTimeLimitDraft] = useState("");
+  const [drawCountDraft, setDrawCountDraft] = useState('');
+  const [savingCount, setSavingCount] = useState(false);
   const [savingTimeLimit, setSavingTimeLimit] = useState(false);
   const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
   const [showReportModal, setShowReportModal] = useState(false);
@@ -60,6 +65,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
       const found = exams.find((e) => e.id === id);
       setExam(found ?? null);
       setTimeLimitDraft(found ? String(found.time_limit) : "");
+      setDrawCountDraft(found?.draw_count ? String(found.draw_count) : '');
     }
     if (qRes.ok) {
       setQuestions(await qRes.json());
@@ -134,6 +140,19 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
     }
   };
 
+  const saveDrawCount = async () => {
+    const count = Number(drawCountDraft);
+    if (!Number.isInteger(count) || count < 1 || count > questions.length) return toast.error('จำนวนข้อเกินคลังที่มี');
+    setSavingCount(true);
+    try {
+      const response = await fetch('/api/exams', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, draw_count: count }) });
+      if (!response.ok) { const data = await response.json() as { error?: string }; throw new Error(data.error ?? 'บันทึกไม่สำเร็จ'); }
+      setExam(previous => previous ? { ...previous, draw_count: count } : null);
+      toast.success('บันทึกจำนวนข้อที่ใช้สอบแล้ว');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'ไม่สามารถบันทึกได้'); }
+    finally { setSavingCount(false); }
+  };
+
   const printOfflineExam = (mode: "questions" | "answers") => {
     if (questions.length === 0) {
       toast.error("ยังไม่มีข้อสอบสำหรับพิมพ์");
@@ -193,7 +212,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
     setModalConfig({
       isOpen: true,
       title: "สุ่มข้อสอบใหม่ให้นักเรียน",
-      message: `คุณต้องการสุ่มชุดข้อสอบใหม่ให้นักเรียน "${studentName}" ใช่หรือไม่?\n\n• คำตอบที่ทำค้างไว้จะถูกล้างออก\n• ระบบจะสุ่มสลับลำดับข้อสอบและตัวเลือกใหม่ทั้งหมดทันที\n• หน้าจอของนักเรียนจะรีเซ็ตและเริ่มทำข้อสอบชุดใหม่ทันที`,
+      message: `คุณต้องการสุ่มชุดข้อสอบใหม่ให้นักเรียน "${studentName}" ใช่หรือไม่?\n\n• คำตอบที่ทำค้างไว้จะถูกล้างออก\n• ระบบจะสุ่มจากคลังทั้งหมดตามจำนวนข้อที่ตั้งไว้\n• เริ่มเวลาและนับพฤติกรรมใหม่ โดยเลือกข้อที่ยังไม่เคยเห็นก่อน`,
       variant: "warning",
       confirmText: "สุ่มข้อสอบใหม่",
       cancelText: "ยกเลิก",
@@ -215,12 +234,12 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   if (loading) return <div className="card text-center py-16 text-slate-400">กำลังโหลด...</div>;
   if (!exam) return <div className="card text-center py-16 text-slate-400">ไม่พบชุดข้อสอบ</div>;
 
-  const answerChoiceCount = Math.max(1, ...questions.map((question) => question.choices.length));
+  const answerChoiceCount = Math.max(1, ...offlineQuestions.map((question) => question.choices.length));
   const answerChoiceLabels = LABELS.slice(0, answerChoiceCount);
   const answerSheetGridStyle = { gridTemplateColumns: `10mm repeat(${answerChoiceCount}, minmax(0, 1fr))` };
   const answerGroups = Array.from(
-    { length: Math.ceil(questions.length / 10) },
-    (_, groupIndex) => questions.slice(groupIndex * 10, groupIndex * 10 + 10),
+    { length: Math.ceil(offlineQuestions.length / 10) },
+    (_, groupIndex) => offlineQuestions.slice(groupIndex * 10, groupIndex * 10 + 10),
   );
 
   return (
@@ -248,9 +267,13 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
             <h1 className="text-2xl font-bold text-slate-800">{exam.title}</h1>
             {exam.description && <p className="text-slate-500 text-sm mt-1">{exam.description}</p>}
             <p className="text-sm text-slate-400 mt-2">
-              {questions.length} ข้อ · {exam.time_limit} นาที · รหัส: <span className="font-mono font-bold text-blue-600">{exam.token}</span>
+              คลัง {questions.length} ข้อ · ใช้สอบ {exam.draw_count ?? questions.length} ข้อ · {exam.time_limit} นาที · รหัส: <span className="font-mono font-bold text-blue-600">{exam.token}</span>
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label htmlFor="exam-draw-count" className="text-xs font-semibold text-slate-600">จำนวนข้อที่ใช้สอบ</label>
+              <input id="exam-draw-count" type="number" min={1} max={questions.length} value={drawCountDraft} onChange={e => setDrawCountDraft(e.target.value)} className="input-field w-24 py-1.5 text-sm" />
+              <button type="button" onClick={saveDrawCount} disabled={savingCount} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs">{savingCount ? 'กำลังบันทึก...' : 'บันทึกจำนวนข้อ'}</button>
+              <span className="text-xs text-slate-500">ใช้กับรอบใหม่ รอบที่เริ่มแล้วคงชุดเดิม</span>
               <label htmlFor="exam-time-limit" className="text-xs font-semibold text-slate-600">แก้เวลาสอบ</label>
               <input
                 id="exam-time-limit"
@@ -527,7 +550,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           examTitle={exam.title}
           subject={exam.subject}
           timeLimit={exam.time_limit}
-          questionCount={questions.length}
+          questionCount={exam.draw_count ?? questions.length}
           classrooms={classrooms}
           results={results}
           onClose={() => setShowReportModal(false)}
@@ -545,7 +568,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
             <p>แบบทดสอบวิชา {exam.subject}</p>
             <h2>{exam.title}</h2>
             <p className="offline-exam-print-meta">
-              จำนวน {questions.length} ข้อ · เวลา {exam.time_limit} นาที · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน
+              จำนวน {offlineQuestions.length} ข้อ · เวลา {exam.time_limit} นาที · คะแนนเต็ม {offlineQuestions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน
             </p>
           </header>
 
@@ -554,7 +577,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           </div>
 
           <main className="offline-exam-print-question-list">
-            {questions.map((question, questionIndex) => (
+            {offlineQuestions.map((question, questionIndex) => (
               <article className="offline-exam-print-question" key={question.id}>
                 <div className="offline-exam-print-question-text">
                   <span className="offline-exam-print-number">{questionIndex + 1}.</span>
@@ -582,12 +605,13 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
         </section>
 
         <section className="offline-exam-print-answers">
-          <div className="offline-answer-sheet">
+          {Array.from({ length: Math.ceil(answerGroups.length / 6) }, (_, pageIndex) => (
+          <div className="offline-answer-sheet" key={`answer-page-${pageIndex}`}>
             <header className="offline-answer-sheet-header">
               <div>
                 <h1>กระดาษคำตอบ</h1>
                 <p>วิชา {exam.subject} · {exam.title}</p>
-                <p className="offline-answer-sheet-meta">จำนวน {questions.length} ข้อ · คะแนนเต็ม {questions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน</p>
+                <p className="offline-answer-sheet-meta">จำนวน {offlineQuestions.length} ข้อ · คะแนนเต็ม {offlineQuestions.reduce((sum, question) => sum + (question.points || 1), 0)} คะแนน</p>
               </div>
               <img src="/school-logo.png" alt="ตราโรงเรียนบ้านครัว" className="offline-answer-sheet-logo" />
             </header>
@@ -615,14 +639,14 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
             </div>
 
             <div className="offline-answer-sheet-columns">
-              {answerGroups.map((group, groupIndex) => (
+              {answerGroups.slice(pageIndex * 6, pageIndex * 6 + 6).map((group, groupIndex) => (
                 <section className="offline-answer-sheet-column" key={`answer-group-${groupIndex}`}>
                   <div className="offline-answer-sheet-column-header" style={answerSheetGridStyle}>
                     <span>ข้อ</span>
                     {answerChoiceLabels.map((label) => <span key={label}>{label}</span>)}
                   </div>
                   {group.map((question, questionIndex) => {
-                    const number = groupIndex * 10 + questionIndex + 1;
+                    const number = pageIndex * 60 + groupIndex * 10 + questionIndex + 1;
                     return (
                       <div className="offline-answer-sheet-row" key={question.id} style={answerSheetGridStyle}>
                         <span className="offline-answer-sheet-number">{number}</span>
@@ -640,8 +664,9 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
               ))}
             </div>
 
-            <footer className="offline-answer-sheet-footer">กระดาษคำตอบสำหรับการสอบออฟไลน์ · โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์)</footer>
+            <footer className="offline-answer-sheet-footer">กระดาษคำตอบสำหรับการสอบออฟไลน์ · โรงเรียนบ้านครัว (ซิเมนต์ไทยสงเคราะห์) · หน้า {pageIndex + 1}/{Math.ceil(answerGroups.length / 6)}</footer>
           </div>
+          ))}
         </section>
       </div>
     </>
