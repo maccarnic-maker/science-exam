@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, PlusCircle, QrCode, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { BookOpen, PlusCircle, QrCode, Settings, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import toast from "react-hot-toast";
 
 import CustomModal, { ModalConfig } from "@/components/ui/Modal";
@@ -138,10 +138,10 @@ export default function ExamsListPage() {
                   className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
                   <QrCode className="w-4 h-4" /> QR / ลิงค์
                 </Link>
-                {/* Edit */}
+                {/* Manage */}
                 <Link href={`/teacher/exams/${exam.id}`}
                   className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
-                  <Pencil className="w-4 h-4" /> แก้ไข
+                  <Settings className="w-4 h-4" /> จัดการ
                 </Link>
                 {/* Toggle */}
                 <button onClick={() => toggleActive(exam)}
