@@ -15,11 +15,26 @@ function StudentRegisterContent({ examId }: { examId: string }) {
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string>(classroomId ?? "");
-  const [form, setForm] = useState({ name: "", surname: "", number: "" });
+  const [form, setForm] = useState({ prefix: "", name: "", surname: "", number: "" });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const selectedClassroom = classrooms.find((c) => c.id === selectedClassroomId);
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("student_info");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setForm({
+          prefix: parsed.prefix || "",
+          name: parsed.first_name || "",
+          surname: parsed.last_name || "",
+          number: parsed.number || "",
+        });
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -47,14 +62,33 @@ function StudentRegisterContent({ examId }: { examId: string }) {
 
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.prefix) return toast.error("กรุณาเลือกคำนำหน้าชื่อ");
     if (!form.name.trim()) return toast.error("กรุณากรอกชื่อ");
     if (!form.surname.trim()) return toast.error("กรุณากรอกนามสกุล");
     if (!form.number.trim()) return toast.error("กรุณากรอกเลขที่");
     if (!selectedClassroomId) return toast.error("กรุณาเลือกห้องเรียน");
 
     setSubmitting(true);
-    const fullName = `${form.name.trim()} ${form.surname.trim()}`;
-    sessionStorage.setItem("student_info", JSON.stringify({ name: fullName, number: form.number, classroom_id: selectedClassroomId }));
+    let cleanName = form.name.trim();
+    // ตัดคำนำหน้าที่นักเรียนอาจเผลอพิมพ์ซ้ำในช่องชื่อ
+    const redundant = ["เด็กชาย", "เด็กหญิง", "ด.ช.", "ด.ญ.", "ดช.", "ดญ.", "ด.ช", "ด.ญ", "ดช", "ดญ", "นาย", "นางสาว", "น.ส.", "นส.", "น.ส", "นส"];
+    for (const r of redundant) {
+      if (cleanName.startsWith(r)) {
+        cleanName = cleanName.substring(r.length).trim();
+        break;
+      }
+    }
+    if (!cleanName) cleanName = form.name.trim();
+
+    const fullName = `${form.prefix}${cleanName} ${form.surname.trim()}`;
+    sessionStorage.setItem("student_info", JSON.stringify({
+      name: fullName,
+      prefix: form.prefix,
+      first_name: cleanName,
+      last_name: form.surname.trim(),
+      number: form.number.trim(),
+      classroom_id: selectedClassroomId
+    }));
     router.push(`/exam/${examId}/take`);
   };
 
@@ -129,20 +163,51 @@ function StudentRegisterContent({ examId }: { examId: string }) {
               </div>
             </div>
           )}
+          {/* Prefix Selector */}
           <div>
-            <label className="label">ชื่อ</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input className="input-field pl-10" placeholder="ชื่อ" value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+            <label className="label">คำนำหน้าชื่อ</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {["เด็กชาย", "เด็กหญิง", "นาย", "นางสาว"].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, prefix: p }))}
+                  className={`py-2.5 px-2 rounded-xl text-sm font-semibold border-2 transition-all text-center ${
+                    form.prefix === p
+                      ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm font-bold"
+                      : "border-slate-200 bg-white/80 text-slate-600 hover:border-blue-300 hover:bg-white"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
           </div>
-          <div>
-            <label className="label">นามสกุล</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input className="input-field pl-10" placeholder="นามสกุล" value={form.surname}
-                onChange={(e) => setForm((p) => ({ ...p, surname: e.target.value }))} />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">ชื่อ</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  className="input-field pl-10"
+                  placeholder="ชื่อจริง (ไม่ต้องพิมพ์คำนำหน้า)"
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label">นามสกุล</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  className="input-field pl-10"
+                  placeholder="นามสกุล"
+                  value={form.surname}
+                  onChange={(e) => setForm((p) => ({ ...p, surname: e.target.value }))}
+                />
+              </div>
             </div>
           </div>
           <div>
