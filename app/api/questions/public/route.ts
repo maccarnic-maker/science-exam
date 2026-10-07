@@ -29,20 +29,45 @@ export async function GET(req: NextRequest) {
     if (classroomId && studentName && studentNumber) {
       const room = await db.prepare('SELECT id FROM classrooms WHERE id = ? AND exam_id = ?').bind(classroomId, examId).first();
       if (!room || !studentName.trim() || studentName.length > 200 || studentNumber.length > 30) return NextResponse.json({ error: 'ข้อมูลนักเรียนหรือห้องเรียนไม่ถูกต้อง' }, { status: 400 });
-      const existing = await db
-        .prepare("SELECT id, status FROM exam_sessions WHERE exam_id = ? AND classroom_id = ? AND student_name = ? AND student_number = ? ORDER BY started_at DESC LIMIT 1")
-        .bind(examId, classroomId, studentName.trim().replace(/\s+/g, ' '), studentNumber.trim())
-        .first<{ id: string; status: string }>();
+      const cleanNumber = studentNumber.trim();
+      const cleanName = studentName.trim().replace(/\s+/g, ' ');
+      const numInt = parseInt(cleanNumber, 10);
+
+      // ค้นหารอบสอบเดิมของนักเรียนในห้องนี้:
+      // 1. ตรวจสอบจากเลขที่ (student_number) เป็นหลัก เพื่อรองรับกรณีนักเรียนหลุดแล้วพิมพ์ชื่อสะกดต่างกัน
+      let existing = null;
+      if (!isNaN(numInt) && numInt > 0) {
+        existing = await db
+          .prepare("SELECT id, status, student_name, student_number FROM exam_sessions WHERE exam_id = ? AND classroom_id = ? AND (student_number = ? OR CAST(student_number AS INTEGER) = ?) ORDER BY started_at DESC LIMIT 1")
+          .bind(examId, classroomId, cleanNumber, numInt)
+          .first<{ id: string; status: string; student_name: string; student_number: string }>();
+      } else {
+        existing = await db
+          .prepare("SELECT id, status, student_name, student_number FROM exam_sessions WHERE exam_id = ? AND classroom_id = ? AND student_number = ? ORDER BY started_at DESC LIMIT 1")
+          .bind(examId, classroomId, cleanNumber)
+          .first<{ id: string; status: string; student_name: string; student_number: string }>();
+      }
+
+      // 2. ถ้าไม่พบด้วยเลขที่ ให้ค้นหาด้วยชื่อตรงกันในห้องเดียวกัน
+      if (!existing) {
+        existing = await db
+          .prepare("SELECT id, status, student_name, student_number FROM exam_sessions WHERE exam_id = ? AND classroom_id = ? AND student_name = ? ORDER BY started_at DESC LIMIT 1")
+          .bind(examId, classroomId, cleanName)
+          .first<{ id: string; status: string; student_name: string; student_number: string }>();
+      }
 
       if (existing) {
         sessionId = existing.id;
-        // update last active
-        await db.prepare("UPDATE exam_sessions SET last_active_at = unixepoch() WHERE id = ? AND status <> 'completed'").bind(sessionId).run();
+        // หากรอบสอบยังไม่เสร็จ ให้อัปเดตเวลาใช้งานล่าสุด และอัปเดตชื่อให้ถูกต้องหากมีการแก้ไข
+        if (existing.status !== 'completed') {
+          await db.prepare("UPDATE exam_sessions SET last_active_at = unixepoch(), student_name = ?, student_number = ? WHERE id = ?")
+            .bind(cleanName, cleanNumber, sessionId).run();
+        }
       } else {
         sessionId = generateId();
         await db
           .prepare("INSERT INTO exam_sessions (id, exam_id, classroom_id, student_name, student_number, started_at, last_active_at, status, tab_switches) VALUES (?,?,?,?,?,unixepoch(),unixepoch(),'in_progress',0)")
-          .bind(sessionId, examId, classroomId, studentName.trim().replace(/\s+/g, ' '), studentNumber.trim())
+          .bind(sessionId, examId, classroomId, cleanName, cleanNumber)
           .run();
       }
     }
