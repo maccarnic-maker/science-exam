@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const exams = await db
-      .prepare("SELECT e.*, COUNT(DISTINCT q.id) as question_count, GROUP_CONCAT(DISTINCT cls.grade) AS grades FROM exams e LEFT JOIN questions q ON q.exam_id = COALESCE(e.bank_exam_id,e.id) LEFT JOIN classrooms cls ON cls.exam_id = e.id GROUP BY e.id ORDER BY e.created_at DESC")
+      .prepare("SELECT e.*, (SELECT MAX(s.started_at) FROM exam_sessions s WHERE s.exam_id = e.id) AS last_student_started_at, COUNT(DISTINCT q.id) as question_count, GROUP_CONCAT(DISTINCT cls.grade) AS grades FROM exams e LEFT JOIN questions q ON q.exam_id = COALESCE(e.bank_exam_id,e.id) LEFT JOIN classrooms cls ON cls.exam_id = e.id GROUP BY e.id ORDER BY e.created_at DESC")
       .bind()
       .all();
 
@@ -108,6 +108,7 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.is_active !== "boolean" && body.is_active !== 0 && body.is_active !== 1) {
       return NextResponse.json({ error: "รูปแบบสถานะการสอบไม่ถูกต้อง" }, { status: 400 });
     }
+    if (body.is_active) updates.push("last_opened_at = CASE WHEN is_active = 0 THEN unixepoch() ELSE last_opened_at END");
     updates.push("is_active = ?");
     values.push(body.is_active ? 1 : 0);
   }

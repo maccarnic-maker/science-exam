@@ -9,6 +9,10 @@ interface ExamSummary {
   is_active: number;
   question_count: number;
   created_at: number;
+  subject: string;
+  grades: string | null;
+  last_opened_at: number | null;
+  last_student_started_at: number | null;
 }
 
 export default function TeacherDashboard() {
@@ -34,6 +38,8 @@ export default function TeacherDashboard() {
 
   const activeCount = exams.filter((e) => e.is_active).length;
   const totalQ = exams.reduce((s, e) => s + (e.question_count ?? 0), 0);
+  const recentOpenedExams = exams.filter(exam => exam.last_opened_at || exam.last_student_started_at || exam.is_active)
+    .sort((a, b) => (b.last_opened_at ?? b.last_student_started_at ?? 0) - (a.last_opened_at ?? a.last_student_started_at ?? 0));
 
   const stats = [
     { label: "ชุดข้อสอบทั้งหมด", value: exams.length, icon: BookOpen, color: "blue" },
@@ -69,7 +75,7 @@ export default function TeacherDashboard() {
 
       {/* Quick Action */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-slate-700">ชุดข้อสอบล่าสุด</h2>
+        <h2 className="text-xl font-bold text-slate-700">วิชาที่เปิดสอบล่าสุด</h2>
         <Link href="/teacher/exams/new" className="btn-primary flex items-center gap-2 text-sm py-2">
           <PlusCircle className="w-4 h-4" /> สร้างชุดข้อสอบใหม่
         </Link>
@@ -78,17 +84,17 @@ export default function TeacherDashboard() {
       {/* Recent Exams */}
       {loading ? (
         <div className="card text-center text-slate-400 py-12">กำลังโหลด...</div>
-      ) : exams.length === 0 ? (
+      ) : recentOpenedExams.length === 0 ? (
         <div className="card text-center py-16">
           <BookOpen className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">ยังไม่มีชุดข้อสอบ</p>
-          <Link href="/teacher/exams/new" className="btn-primary inline-flex items-center gap-2 mt-4 text-sm py-2">
-            <PlusCircle className="w-4 h-4" /> สร้างชุดข้อสอบแรก
+          <p className="text-slate-500 text-lg">ยังไม่มีประวัติการเปิดสอบ</p>
+          <Link href="/teacher/exams" className="btn-primary inline-flex items-center gap-2 mt-4 text-sm py-2">
+            <BookOpen className="w-4 h-4" /> ดูชุดข้อสอบทั้งหมด
           </Link>
         </div>
       ) : (
         <div className="grid gap-3">
-          {exams.slice(0, 5).map((exam) => (
+          {recentOpenedExams.slice(0, 5).map((exam) => (
             <Link key={exam.id} href={`/teacher/exams/${exam.id}`}
               className="card hover:shadow-md transition-all duration-200 hover:border-blue-200 flex items-center justify-between group">
               <div className="flex items-center gap-4">
@@ -97,7 +103,12 @@ export default function TeacherDashboard() {
                 </div>
                 <div>
                   <p className="font-semibold text-slate-800 group-hover:text-blue-700">{exam.title}</p>
-                  <p className="text-sm text-slate-400">{exam.question_count ?? 0} ข้อ</p>
+                  <p className="text-sm text-slate-400">{exam.subject} · {exam.grades || 'ยังไม่ระบุชั้น'} · {exam.question_count ?? 0} ข้อ</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {exam.last_opened_at || exam.last_student_started_at
+                      ? `${exam.last_opened_at ? 'เปิดสอบล่าสุด' : 'ข้อมูลย้อนหลัง: นักเรียนเริ่มสอบล่าสุด'} ${new Date((exam.last_opened_at ?? exam.last_student_started_at ?? 0) * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`
+                      : 'ไม่ทราบเวลาเปิดสอบเดิม'}
+                  </p>
                 </div>
               </div>
               <span className={exam.is_active ? "badge-active" : "badge-inactive"}>
@@ -105,7 +116,7 @@ export default function TeacherDashboard() {
               </span>
             </Link>
           ))}
-          {exams.length > 5 && (
+          {exams.length > 0 && (
             <Link href="/teacher/exams" className="text-center text-blue-600 text-sm hover:underline py-2">
               ดูทั้งหมด ({exams.length} ชุด)
             </Link>
