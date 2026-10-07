@@ -47,8 +47,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [timeLimitDraft, setTimeLimitDraft] = useState("");
   const [drawCountDraft, setDrawCountDraft] = useState('');
-  const [savingCount, setSavingCount] = useState(false);
-  const [savingTimeLimit, setSavingTimeLimit] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
   const [showReportModal, setShowReportModal] = useState(false);
 
@@ -109,47 +108,40 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
     }
   };
 
-  const saveTimeLimit = async () => {
-    if (!exam) return;
+  const saveExamSettings = async () => {
+    if (!exam || savingSettings) return;
+    const count = Number(drawCountDraft);
+    if (!Number.isInteger(count) || count < 1 || count > questions.length) {
+      toast.error(`จำนวนข้อที่ใช้สอบต้องเป็นจำนวนเต็มระหว่าง 1 ถึง ${questions.length} ข้อ`);
+      return;
+    }
     const timeLimit = Number(timeLimitDraft);
     if (!Number.isInteger(timeLimit) || timeLimit < 1 || timeLimit > 300) {
       toast.error("เวลาสอบต้องเป็นจำนวนเต็มระหว่าง 1 ถึง 300 นาที");
       return;
     }
 
-    setSavingTimeLimit(true);
+    setSavingSettings(true);
     try {
       const res = await fetch("/api/exams", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, time_limit: timeLimit }),
+        body: JSON.stringify({ id, draw_count: count, time_limit: timeLimit }),
       });
       if (!res.ok) {
         const err = (await res.json()) as { error?: string };
-        toast.error(err.error ?? "แก้เวลาไม่สำเร็จ");
+        toast.error(err.error ?? "บันทึกการตั้งค่าสอบไม่สำเร็จ");
         return;
       }
-      setExam((prev) => prev ? { ...prev, time_limit: timeLimit } : null);
+      setExam((prev) => prev ? { ...prev, draw_count: count, time_limit: timeLimit } : null);
+      setDrawCountDraft(String(count));
       setTimeLimitDraft(String(timeLimit));
-      toast.success("แก้เวลาสอบเรียบร้อยแล้ว");
+      toast.success("บันทึกจำนวนข้อและเวลาสอบเรียบร้อยแล้ว");
     } catch {
-      toast.error("ไม่สามารถเชื่อมต่อเพื่อแก้เวลาได้");
+      toast.error("ไม่สามารถเชื่อมต่อเพื่อบันทึกการตั้งค่าสอบได้");
     } finally {
-      setSavingTimeLimit(false);
+      setSavingSettings(false);
     }
-  };
-
-  const saveDrawCount = async () => {
-    const count = Number(drawCountDraft);
-    if (!Number.isInteger(count) || count < 1 || count > questions.length) return toast.error('จำนวนข้อเกินคลังที่มี');
-    setSavingCount(true);
-    try {
-      const response = await fetch('/api/exams', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, draw_count: count }) });
-      if (!response.ok) { const data = await response.json() as { error?: string }; throw new Error(data.error ?? 'บันทึกไม่สำเร็จ'); }
-      setExam(previous => previous ? { ...previous, draw_count: count } : null);
-      toast.success('บันทึกจำนวนข้อที่ใช้สอบแล้ว');
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'ไม่สามารถบันทึกได้'); }
-    finally { setSavingCount(false); }
   };
 
   const printOfflineExam = (mode: "questions" | "answers") => {
@@ -270,9 +262,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <label htmlFor="exam-draw-count" className="text-xs font-semibold text-slate-600">จำนวนข้อที่ใช้สอบ</label>
-              <input id="exam-draw-count" type="number" min={1} max={questions.length} value={drawCountDraft} onChange={e => setDrawCountDraft(e.target.value)} className="input-field w-24 py-1.5 text-sm" />
-              <button type="button" onClick={saveDrawCount} disabled={savingCount} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs">{savingCount ? 'กำลังบันทึก...' : 'บันทึกจำนวนข้อ'}</button>
-              <span className="text-xs text-slate-500">ใช้กับรอบใหม่ รอบที่เริ่มแล้วคงชุดเดิม</span>
+              <input id="exam-draw-count" type="number" min={1} max={questions.length} value={drawCountDraft} disabled={savingSettings} onChange={e => setDrawCountDraft(e.target.value)} className="input-field w-24 py-1.5 text-sm" />
               <label htmlFor="exam-time-limit" className="text-xs font-semibold text-slate-600">แก้เวลาสอบ</label>
               <input
                 id="exam-time-limit"
@@ -280,6 +270,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
                 min={1}
                 max={300}
                 value={timeLimitDraft}
+                disabled={savingSettings}
                 onChange={(e) => setTimeLimitDraft(e.target.value)}
                 className="input-field w-24 py-1.5 text-sm"
                 aria-label="เวลาสอบเป็นนาที"
@@ -287,12 +278,13 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
               <span className="text-xs text-slate-400">นาที</span>
               <button
                 type="button"
-                onClick={saveTimeLimit}
-                disabled={savingTimeLimit}
+                onClick={saveExamSettings}
+                disabled={savingSettings || questions.length === 0}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Save className="w-3.5 h-3.5" /> {savingTimeLimit ? "กำลังบันทึก..." : "บันทึกเวลา"}
+                <Save className="w-3.5 h-3.5" /> {savingSettings ? "กำลังบันทึก..." : "บันทึกการตั้งค่าสอบ"}
               </button>
+              <span className="text-xs text-slate-500">จำนวนข้อใช้กับรอบใหม่ รอบที่เริ่มแล้วคงชุดเดิม</span>
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
