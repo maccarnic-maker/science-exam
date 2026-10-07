@@ -13,6 +13,21 @@ interface ValidatedAnswer extends ResultAnswer {
   isCorrect: number;
 }
 
+function normalizeStudentName(name: string): string {
+  let s = name.trim().replace(/\s+/g, "");
+  const prefixes = [
+    "เด็กชาย", "เด็กหญิง", "ด.ช.", "ด.ญ.", "ดช.", "ดญ.",
+    "ด.ช", "ด.ญ", "ดช", "ดญ", "นาย", "นางสาว", "น.ส.", "นส.", "น.ส", "นส"
+  ];
+  for (const p of prefixes) {
+    if (s.startsWith(p)) {
+      s = s.substring(p.length);
+      break;
+    }
+  }
+  return s;
+}
+
 // POST /api/results – นักเรียนส่งคำตอบ
 export async function POST(req: NextRequest) {
   const db = getDB(req);
@@ -38,8 +53,11 @@ export async function POST(req: NextRequest) {
   try {
     if (req.headers.get('origin') !== new URL(req.url).origin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (!actualSessionId) return NextResponse.json({ error: 'กรุณาเริ่มรอบสอบก่อนส่งคำตอบ' }, { status: 400 });
-    const permission = await db.prepare('SELECT progress_token FROM exam_sessions WHERE id = ?').bind(actualSessionId).first<{ progress_token: string | null }>();
-    if (!permission?.progress_token || req.cookies.get(`exam_progress_${actualSessionId}`)?.value !== permission.progress_token) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const permission = await db.prepare('SELECT progress_token, student_name, student_number FROM exam_sessions WHERE id = ?').bind(actualSessionId).first<{ progress_token: string | null; student_name: string; student_number: string }>();
+    const cookieToken = req.cookies.get(`exam_progress_${actualSessionId}`)?.value;
+    const cookieMatches = !!(permission?.progress_token && cookieToken === permission.progress_token);
+    const credsMatch = !!(permission && normalizeStudentName(permission.student_name) === normalizeStudentName(student_name) && String(permission.student_number).trim() === String(student_number).trim());
+    if (!cookieMatches && !credsMatch) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (actualSessionId) {
       // ตรวจสอบว่า session ยังอยู่หรือไม่
       const existing = await db

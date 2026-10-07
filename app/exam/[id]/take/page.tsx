@@ -83,7 +83,21 @@ export default function TakeExamPage() {
         fetch(`/api/questions/public?${qParams.toString()}`),
       ]);
 
-      if (!eRes.ok || !qRes.ok) { toast.error("ไม่พบข้อสอบหรือการสอบถูกปิด"); return; }
+      if (!eRes.ok || !qRes.ok) {
+        const err = !qRes.ok ? await qRes.json().catch(() => null) : null;
+        const errMsg = err?.error || "ไม่พบข้อสอบหรือการสอบถูกปิด";
+        setModalConfig({
+          isOpen: true,
+          title: "ไม่สามารถเข้าสู่การสอบได้",
+          message: errMsg,
+          variant: "danger",
+          isAlert: true,
+          confirmText: "กลับหน้ากรอกข้อมูล",
+          onConfirm: () => router.push(`/exam/${params.id}`),
+          onClose: () => router.push(`/exam/${params.id}`),
+        });
+        return;
+      }
       const exam = (await eRes.json()) as any;
       const qData = (await qRes.json()) as { session_id?: string; questions?: Question[]; answers?: Record<string, string>; revision?: number; time_left?: number; tab_switches?: number; status?: string; score?: number; total?: number };
 

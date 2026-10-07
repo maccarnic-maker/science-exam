@@ -4,6 +4,21 @@ import { getDB } from "@/lib/cloudflare";
 import { generateId } from "@/lib/utils";
 import { loadPool, drawQuestions, publicQuestions } from '@/lib/question-pool';
 
+function normalizeStudentName(name: string): string {
+  let s = name.trim().replace(/\s+/g, "");
+  const prefixes = [
+    "เด็กชาย", "เด็กหญิง", "ด.ช.", "ด.ญ.", "ดช.", "ดญ.",
+    "ด.ช", "ด.ญ", "ดช", "ดญ", "นาย", "นางสาว", "น.ส.", "นส.", "น.ส", "นส"
+  ];
+  for (const p of prefixes) {
+    if (s.startsWith(p)) {
+      s = s.substring(p.length);
+      break;
+    }
+  }
+  return s;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const examId = searchParams.get("exam_id");
@@ -57,6 +72,14 @@ export async function GET(req: NextRequest) {
       }
 
       if (existing) {
+        const normInput = normalizeStudentName(cleanName);
+        const normExisting = normalizeStudentName(existing.student_name);
+        if (normInput !== normExisting) {
+          return NextResponse.json({
+            error: `เลขที่ ${cleanNumber} มีผู้เข้าสอบแล้ว (${existing.student_name}) กรุณาตรวจสอบเลขที่ให้ถูกต้อง`,
+          }, { status: 409 });
+        }
+
         sessionId = existing.id;
         // หากรอบสอบยังไม่เสร็จ ให้อัปเดตเวลาใช้งานล่าสุด และอัปเดตชื่อให้ถูกต้องหากมีการแก้ไข
         if (existing.status !== 'completed') {

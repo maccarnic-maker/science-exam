@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { FileCheck2, Clock, BookOpen, User, Hash } from "lucide-react";
 import toast from "react-hot-toast";
+import CustomModal, { ModalConfig } from "@/components/ui/Modal";
 
 interface ExamInfo { id: string; title: string; subject: string; time_limit: number; description: string; question_count?: number }
 interface Classroom { id: string; name: string; grade: string }
@@ -18,8 +19,36 @@ function StudentRegisterContent({ examId }: { examId: string }) {
   const [form, setForm] = useState({ prefix: "", name: "", surname: "", number: "" });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
+  const [numberWarning, setNumberWarning] = useState<string | null>(null);
 
   const selectedClassroom = classrooms.find((c) => c.id === selectedClassroomId);
+
+  const checkNumberOnBlur = async () => {
+    if (!form.number.trim() || !selectedClassroomId) return;
+    const cleanName = form.name.trim();
+    const fullName = form.prefix ? `${form.prefix}${cleanName} ${form.surname.trim()}` : cleanName;
+    try {
+      const res = await fetch("/api/exam-sessions/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exam_id: examId,
+          classroom_id: selectedClassroomId,
+          student_number: form.number.trim(),
+          student_name: fullName || "นักเรียน",
+        }),
+      });
+      const data = (await res.json()) as any;
+      if (data.conflict) {
+        setNumberWarning(`⚠️ เลขที่นี้มีผู้เข้าสอบแล้ว (${data.existing_name})`);
+      } else {
+        setNumberWarning(null);
+      }
+    } catch {
+      setNumberWarning(null);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -81,6 +110,40 @@ function StudentRegisterContent({ examId }: { examId: string }) {
     if (!cleanName) cleanName = form.name.trim();
 
     const fullName = `${form.prefix}${cleanName} ${form.surname.trim()}`;
+
+    // ตรวจสอบเลขที่ซ้ำก่อนเข้าสู่การสอบ
+    try {
+      const checkRes = await fetch("/api/exam-sessions/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exam_id: examId,
+          classroom_id: selectedClassroomId,
+          student_number: form.number.trim(),
+          student_name: fullName,
+        }),
+      });
+
+      const checkData = (await checkRes.json()) as any;
+      if (!checkRes.ok || !checkData.ok) {
+        setSubmitting(false);
+        setModalConfig({
+          isOpen: true,
+          title: checkData.conflict ? "เลขที่ซ้ำกับผู้อื่น ⚠️" : "ไม่สามารถเข้าสู่การสอบได้",
+          message: checkData.message || "เกิดข้อผิดพลาดในการตรวจสอบข้อมูล กรุณาลองใหม่อีกครั้ง",
+          variant: "danger",
+          isAlert: true,
+          confirmText: "แก้ไขข้อมูล",
+          onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+        });
+        return;
+      }
+    } catch {
+      setSubmitting(false);
+      toast.error("ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+
     sessionStorage.setItem("student_info", JSON.stringify({
       name: fullName,
       prefix: form.prefix,
@@ -218,9 +281,23 @@ function StudentRegisterContent({ examId }: { examId: string }) {
             <label className="label">เลขที่</label>
             <div className="relative">
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input className="input-field pl-10" placeholder="เลขที่ในห้อง" type="number" min="1"
-                value={form.number} onChange={(e) => setForm((p) => ({ ...p, number: e.target.value }))} />
+              <input
+                className={`input-field pl-10 ${numberWarning ? "border-red-500 focus:ring-red-500" : ""}`}
+                placeholder="เลขที่ในห้อง"
+                type="number"
+                min="1"
+                value={form.number}
+                onChange={(e) => {
+                  setNumberWarning(null);
+                  setForm((p) => ({ ...p, number: e.target.value }));
+                }}
+                onBlur={checkNumberOnBlur}
+                required
+              />
             </div>
+            {numberWarning && (
+              <p className="text-red-500 text-xs font-semibold mt-1 animate-fade-in">{numberWarning}</p>
+            )}
           </div>
 
           <button type="submit" disabled={submitting}
@@ -229,6 +306,8 @@ function StudentRegisterContent({ examId }: { examId: string }) {
           </button>
         </form>
       </div>
+
+      <CustomModal {...modalConfig} />
     </div>
   );
 }
