@@ -14,9 +14,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const exam = await db
-      .prepare("SELECT id, title, description, subject, time_limit, token FROM exams WHERE (id = ? OR token = ?) AND is_active = 1")
+      .prepare(
+        `SELECT e.id, e.title, e.description, e.subject, e.time_limit, e.token,
+                COALESCE(e.draw_count, (SELECT COUNT(*) FROM questions q WHERE q.exam_id = COALESCE(e.bank_exam_id, e.id))) AS question_count
+         FROM exams e
+         WHERE (e.id = ? OR e.token = ?) AND e.is_active = 1`
+      )
       .bind(queryParam, queryParam)
-      .first<{ id: string; title: string; description: string; subject: string; time_limit: number; token: string }>();
+      .first<{ id: string; title: string; description: string; subject: string; time_limit: number; token: string; question_count: number }>();
 
     if (!exam) return NextResponse.json({ error: "Exam not found or closed" }, { status: 404 });
     return NextResponse.json(exam);

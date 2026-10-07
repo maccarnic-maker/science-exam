@@ -4,7 +4,7 @@ import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { FileCheck2, Clock, BookOpen, User, Hash } from "lucide-react";
 import toast from "react-hot-toast";
 
-interface ExamInfo { id: string; title: string; subject: string; time_limit: number; description: string }
+interface ExamInfo { id: string; title: string; subject: string; time_limit: number; description: string; question_count?: number }
 interface Classroom { id: string; name: string; grade: string }
 
 function StudentRegisterContent({ examId }: { examId: string }) {
@@ -124,7 +124,12 @@ function StudentRegisterContent({ examId }: { examId: string }) {
           </div>
           <p className="text-xs font-bold text-blue-600 mb-1 tracking-wide">โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)</p>
           <h1 className="text-2xl font-bold text-slate-800">{exam.title}</h1>
-          {exam.description && <p className="text-slate-500 text-sm mt-1">{exam.description}</p>}
+          <p className="text-slate-600 text-sm mt-1 font-medium">
+            ข้อสอบทั้งหมด {exam.question_count ?? 30} ข้อ
+            {exam.description && !exam.description.includes("คลังข้อสอบ") && !exam.description.includes("ข้อสอบทั้งหมด")
+              ? ` · ${exam.description}`
+              : ""}
+          </p>
 
           <div className="flex justify-center gap-4 mt-4">
             <div className="flex items-center gap-1 text-sm text-slate-500">
@@ -166,21 +171,20 @@ function StudentRegisterContent({ examId }: { examId: string }) {
           {/* Prefix Selector */}
           <div>
             <label className="label">คำนำหน้าชื่อ</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {["เด็กชาย", "เด็กหญิง", "นาย", "นางสาว"].map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, prefix: p }))}
-                  className={`py-2.5 px-2 rounded-xl text-sm font-semibold border-2 transition-all text-center ${
-                    form.prefix === p
-                      ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm font-bold"
-                      : "border-slate-200 bg-white/80 text-slate-600 hover:border-blue-300 hover:bg-white"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                className="input-field pl-10 cursor-pointer"
+                value={form.prefix}
+                onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value }))}
+                required
+              >
+                <option value="">-- เลือกคำนำหน้าชื่อ --</option>
+                <option value="เด็กชาย">เด็กชาย</option>
+                <option value="เด็กหญิง">เด็กหญิง</option>
+                <option value="นาย">นาย</option>
+                <option value="นางสาว">นางสาว</option>
+              </select>
             </div>
           </div>
 
