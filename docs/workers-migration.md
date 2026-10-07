@@ -1,4 +1,4 @@
-# Workers migration (pending production cutover)
+# Workers migration
 
 Next.js 15.5.27 / OpenNext Cloudflare 1.20.8. React 18 is retained.
 The existing D1 `science-exam-db` and R2 `science-exam-files` are shared unchanged.
@@ -7,10 +7,13 @@ No database migration is required for this runtime update.
 ## Current state
 
 - Workers candidate: https://science-exam.maccarnic.workers.dev
-- Production remains on Pages: https://onlinetest.bankruaschool.ac.th
+- Production routes to Workers: `onlinetest.bankruaschool.ac.th/*`.
+- The existing proxied CNAME still points to Pages for rollback.
+- Workers Git build `059fe9a` succeeded; Pages automatic production and preview
+  builds are disabled. The Pages project and its data bindings remain intact.
 - Workers has a new random `NEXTAUTH_SECRET`; never commit or display its value.
-- Workers still requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as secrets.
-- The original Pages settings must remain untouched until cutover is verified.
+- Workers has `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as encrypted secrets.
+- Never delete the original Pages project or alter its data bindings.
 - Missing authentication settings fail closed (OAuth returns 503).
 - Teachers will need to sign in again after cutover because the old signing key
   cannot be exported from Pages. Student sessions and answers remain in D1.
@@ -41,6 +44,9 @@ No database migration is required for this runtime update.
    Pages origin. Do not delete the Pages project, D1, R2 or OAuth client.
 
 ## Local checks
+
+The home page must be `force-dynamic`: authentication reads cookies at runtime
+even when build-time secrets are absent. A static home page causes a runtime 500.
 
 ```sh
 npm ci

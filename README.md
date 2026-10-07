@@ -2,8 +2,8 @@
 **ระบบสอบออนไลน์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)**
 URL: `https://onlinetest.bankruaschool.ac.th`
 
-> สาขานี้เตรียมย้ายไป Workers; production ยังเป็น Pages จนตั้งค่า Google Login
-> และตรวจ cutover ครบ ดู [ขั้นตอนย้ายและ rollback](docs/workers-migration.md)
+> Production ใช้ Workers ผ่าน route โดเมนเดิม และเก็บ Pages ไว้สำหรับ rollback
+> ดู [ขั้นตอนย้ายและ rollback](docs/workers-migration.md)
 
 ---
 
@@ -11,7 +11,7 @@ URL: `https://onlinetest.bankruaschool.ac.th`
 - **Frontend/Backend**: Next.js 15.5.27 + TypeScript + Tailwind CSS
 - **Database**: Cloudflare D1 (SQLite)
 - **Storage**: Cloudflare R2 (รูปภาพ)
-- **Hosting**: Cloudflare Workers + OpenNext (pending production cutover)
+- **Hosting**: Cloudflare Workers + OpenNext
 - **Auth**: Google OAuth + signed HMAC session cookie
 
 ---

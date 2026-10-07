@@ -4,6 +4,10 @@ compatibility_date = "2026-10-06"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
+[[routes]]
+pattern = "onlinetest.bankruaschool.ac.th/*"
+zone_id = "09470ec36ad1dc33a5114158035a04a9"
+
 [vars]
 NEXTAUTH_URL = "https://onlinetest.bankruaschool.ac.th"
 
