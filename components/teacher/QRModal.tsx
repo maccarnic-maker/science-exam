@@ -42,13 +42,13 @@ export default function QRModal({ examId, examTitle, examToken, classrooms, onCl
     if (!svg) return;
     const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement("canvas");
-    canvas.width = 400; canvas.height = 400;
+    canvas.width = 800; canvas.height = 800;
     const ctx = canvas.getContext("2d")!;
     const img = new window.Image();
     img.onload = () => {
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, 400, 400);
-      ctx.drawImage(img, 0, 0, 400, 400);
+      ctx.fillRect(0, 0, 800, 800);
+      ctx.drawImage(img, 0, 0, 800, 800);
       const link = document.createElement("a");
       link.download = `qr-${selected?.name ?? "exam"}.png`;
       link.href = canvas.toDataURL("image/png");
