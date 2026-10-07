@@ -7,13 +7,16 @@ No database migration is required for this runtime update.
 ## Current state
 
 - Workers candidate: https://science-exam.maccarnic.workers.dev
-- Production routes to Workers: `onlinetest.bankruaschool.ac.th/*`.
-- The existing proxied CNAME still points to Pages for rollback.
+- Production uses the Workers Custom Domain `onlinetest.bankruaschool.ac.th`.
+- On 2026-10-07, the user approved permanent removal of the old Pages project.
+  Its custom domain/CNAME and temporary Worker route were removed after the
+  direct Custom Domain was connected. D1 and R2 remain unchanged.
 - Workers Git build `059fe9a` succeeded; Pages automatic production and preview
-  builds are disabled. The Pages project and its data bindings remain intact.
+  builds were disabled before the Pages project was retired.
 - Workers has a new random `NEXTAUTH_SECRET`; never commit or display its value.
 - Workers has `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as encrypted secrets.
-- Never delete the original Pages project or alter its data bindings.
+- Rollback now uses Workers deployment history; Pages deployments are no longer
+  available. Never delete D1 or R2 as part of application cleanup.
 - Missing authentication settings fail closed (OAuth returns 503).
 - Teachers will need to sign in again after cutover because the old signing key
   cannot be exported from Pages. Student sessions and answers remain in D1.

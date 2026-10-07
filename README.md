@@ -2,7 +2,7 @@
 **ระบบสอบออนไลน์ โรงเรียนบ้านครัว(ซิเมนต์ไทยสงเคราะห์)**
 URL: `https://onlinetest.bankruaschool.ac.th`
 
-> Production ใช้ Workers ผ่าน route โดเมนเดิม และเก็บ Pages ไว้สำหรับ rollback
+> Production ผูก Custom Domain กับ Workers โดยตรง; Pages เดิมถูกลบแล้ว
 > ดู [ขั้นตอนย้ายและ rollback](docs/workers-migration.md)
 
 ---
@@ -69,7 +69,7 @@ npm run deploy
 
 ### 5. Custom Domain
 สำหรับการย้ายระบบเดิม ให้ทำตาม `docs/workers-migration.md` ก่อนสลับ route
-และคง Pages เดิมไว้สำหรับ rollback ห้ามลบ DNS หรือ Pages ก่อนตรวจระบบใหม่ครบ
+Pages เดิมถูกลบหลังตรวจระบบใหม่แล้ว การ rollback ให้ใช้ Workers deployment history
 
 ---
 
