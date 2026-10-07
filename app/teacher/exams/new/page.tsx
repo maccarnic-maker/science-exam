@@ -16,7 +16,7 @@ export default function NewExamPage() {
     time_limit: "60" as string | number,
   });
   const [classrooms, setClassrooms] = useState<Classroom[]>([{ name: "ห้อง 1", grade: "ป.6" }]);
-  const [banks, setBanks] = useState<{ id: string; title: string; subject: string; question_count: number; bank_exam_id: string | null; grades: string }[]>([]);
+  const [banks, setBanks] = useState<{ id: string; title: string; subject: string; question_count: number; pool_count?: number; bank_exam_id: string | null; grades: string }[]>([]);
   const [bankId, setBankId] = useState('');
   const [drawCount, setDrawCount] = useState('30');
   useEffect(() => {
@@ -88,11 +88,11 @@ export default function NewExamPage() {
               }
             }}>
               <option value="">สร้างชุดว่างเพื่อเพิ่มข้อเอง</option>
-              {banks.map(bank => <option key={bank.id} value={bank.id}>{bank.title} — คลัง {bank.question_count} ข้อ</option>)}
+              {banks.map(bank => <option key={bank.id} value={bank.id}>{bank.title} — คลัง {bank.pool_count ?? bank.question_count} ข้อ</option>)}
             </select>
             {bankId && <div className="mt-3">
               <label className="label">จำนวนข้อที่สุ่มใช้สอบ</label>
-              <input type="number" min={1} max={banks.find(bank => bank.id === bankId)?.question_count} className="input-field" required value={drawCount} onChange={event => setDrawCount(event.target.value)} />
+              <input type="number" min={1} max={banks.find(bank => bank.id === bankId)?.pool_count ?? banks.find(bank => bank.id === bankId)?.question_count} className="input-field" required value={drawCount} onChange={event => setDrawCount(event.target.value)} />
               <p className="text-xs text-slate-500 mt-1">สุ่มจากคลังต้นทางทั้งหมด ไม่คัดลอกเฉพาะข้อที่เลือกไว้</p>
             </div>}
           </div>

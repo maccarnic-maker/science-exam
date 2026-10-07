@@ -8,6 +8,8 @@ interface ExamSummary {
   title: string;
   is_active: number;
   question_count: number;
+  draw_count?: number | null;
+  pool_count?: number;
   created_at: number;
   subject: string;
   grades: string | null;
