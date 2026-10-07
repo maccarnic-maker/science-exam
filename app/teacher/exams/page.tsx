@@ -15,11 +15,17 @@ interface Exam {
   question_count: number;
   token: string;
   created_at: number;
+  grades: string | null;
 }
+
+const examGrades = (exam: Exam) => (exam.grades ?? '').split(',').map(grade => grade.trim()).filter(Boolean);
 
 export default function ExamsListPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedGrade, setSelectedGrade] = useState('');
+  const grades = Array.from(new Set(exams.flatMap(examGrades))).sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+  const filteredExams = exams.filter(exam => !selectedGrade || (selectedGrade === '__unassigned' ? examGrades(exam).length === 0 : examGrades(exam).includes(selectedGrade)));
   const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
 
   const load = () => {
@@ -86,6 +92,17 @@ export default function ExamsListPage() {
         </Link>
       </div>
 
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <label htmlFor="exam-grade-filter" className="text-sm font-semibold text-slate-600">กรองระดับชั้น</label>
+        <select id="exam-grade-filter" value={selectedGrade} onChange={event => setSelectedGrade(event.target.value)} disabled={loading} className="input-field w-48">
+          <option value="">ทุกระดับชั้น</option>
+          {grades.map(grade => <option key={grade} value={grade}>{grade}</option>)}
+          {exams.some(exam => examGrades(exam).length === 0) && <option value="__unassigned">ยังไม่ระบุชั้น</option>}
+        </select>
+        {!loading && <span className="text-sm text-slate-500" role="status">แสดง {filteredExams.length} จาก {exams.length} ชุด</span>}
+        {selectedGrade && <button type="button" onClick={() => setSelectedGrade('')} className="text-sm text-blue-600 hover:underline">ล้างตัวกรอง</button>}
+      </div>
+
       {loading ? (
         <div className="card text-center py-12 text-slate-400">กำลังโหลด...</div>
       ) : exams.length === 0 ? (
@@ -96,9 +113,11 @@ export default function ExamsListPage() {
             <PlusCircle className="w-5 h-5" /> สร้างชุดข้อสอบแรก
           </Link>
         </div>
+      ) : filteredExams.length === 0 ? (
+        <div className="card text-center py-12 text-slate-500">ไม่พบชุดข้อสอบในระดับชั้นที่เลือก</div>
       ) : (
         <div className="grid gap-4">
-          {exams.map((exam) => (
+          {filteredExams.map((exam) => (
             <div key={exam.id} className="card hover:shadow-md transition-all duration-200 flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">
@@ -106,6 +125,7 @@ export default function ExamsListPage() {
                     {exam.is_active ? "🟢 เปิดสอบ" : "⭕ ปิดอยู่"}
                   </span>
                   <span className="text-xs text-slate-400">{exam.subject}</span>
+                  <span className="text-xs text-indigo-600">{examGrades(exam).join(', ') || 'ยังไม่ระบุชั้น'}</span>
                 </div>
                 <h3 className="text-lg font-bold text-slate-800">{exam.title}</h3>
                 <p className="text-sm text-slate-400 mt-1">
