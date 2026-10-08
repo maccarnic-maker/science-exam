@@ -16,7 +16,20 @@ export async function GET(req: NextRequest) {
     await cleanupInactiveSessions(db);
 
     const exams = await db
-      .prepare("SELECT e.*, (SELECT MAX(s.started_at) FROM exam_sessions s WHERE s.exam_id = e.id) AS last_student_started_at, COALESCE(e.draw_count, COUNT(DISTINCT q.id)) as question_count, COUNT(DISTINCT q.id) as pool_count, GROUP_CONCAT(DISTINCT cls.grade) AS grades FROM exams e LEFT JOIN questions q ON q.exam_id = COALESCE(e.bank_exam_id,e.id) LEFT JOIN classrooms cls ON cls.exam_id = e.id GROUP BY e.id ORDER BY e.created_at DESC")
+      .prepare(`
+        SELECT e.*, 
+          (SELECT MAX(COALESCE(s.last_active_at, s.submitted_at, s.started_at)) FROM exam_sessions s WHERE s.exam_id = e.id) AS last_student_activity_at,
+          (SELECT MAX(s.started_at) FROM exam_sessions s WHERE s.exam_id = e.id) AS last_student_started_at,
+          (SELECT COUNT(DISTINCT s.id) FROM exam_sessions s WHERE s.exam_id = e.id) AS student_count,
+          COALESCE(e.draw_count, COUNT(DISTINCT q.id)) as question_count, 
+          COUNT(DISTINCT q.id) as pool_count, 
+          GROUP_CONCAT(DISTINCT cls.grade) AS grades 
+        FROM exams e 
+        LEFT JOIN questions q ON q.exam_id = COALESCE(e.bank_exam_id,e.id) 
+        LEFT JOIN classrooms cls ON cls.exam_id = e.id 
+        GROUP BY e.id 
+        ORDER BY last_student_activity_at DESC, e.created_at DESC
+      `)
       .bind()
       .all();
 
