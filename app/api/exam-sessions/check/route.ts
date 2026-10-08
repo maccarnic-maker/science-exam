@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/cloudflare";
+import { cleanupInactiveSessions } from "@/lib/session-cleanup";
 
 function normalizeStudentName(name: string): string {
   let s = name.trim().replace(/\s+/g, "");
@@ -36,6 +37,9 @@ export async function POST(req: NextRequest) {
     const cleanNumber = student_number.trim();
     const cleanName = student_name.trim().replace(/\s+/g, " ");
     const numInt = parseInt(cleanNumber, 10);
+
+    // ลบรอบสอบที่ค้างเกิน 30 นาทีของชุดข้อสอบนี้ก่อนตรวจสอบ
+    await cleanupInactiveSessions(db, exam_id);
 
     let existing = null;
     if (!isNaN(numInt) && numInt > 0) {

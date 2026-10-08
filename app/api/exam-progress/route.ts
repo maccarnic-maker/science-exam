@@ -9,8 +9,17 @@ export async function POST(req: NextRequest) {
     if (req.headers.get('origin') !== new URL(req.url).origin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     const body = await req.json() as { session_id?: string; revision?: number; answers?: Record<string, string>; current_question?: string; reshuffle?: boolean };
     if (!body.session_id || !Number.isInteger(body.revision) || !body.answers || typeof body.answers !== 'object' || Array.isArray(body.answers)) return NextResponse.json({ error: 'Invalid progress' }, { status: 400 });
-    const session = await db.prepare('SELECT exam_id, seen_questions, question_order, draft_answers, progress_revision, progress_token, status FROM exam_sessions WHERE id = ?').bind(body.session_id).first<{ exam_id: string; seen_questions: string; question_order: string | null; draft_answers: string; progress_revision: number; progress_token: string | null; status: string }>();
+    const session = await db.prepare('SELECT exam_id, seen_questions, question_order, draft_answers, progress_revision, progress_token, status, last_active_at, started_at FROM exam_sessions WHERE id = ?').bind(body.session_id).first<{ exam_id: string; seen_questions: string; question_order: string | null; draft_answers: string; progress_revision: number; progress_token: string | null; status: string; last_active_at: number | null; started_at: number }>();
     if (!session?.progress_token || req.cookies.get(`exam_progress_${body.session_id}`)?.value !== session.progress_token) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const lastActive = session.last_active_at ?? session.started_at;
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (session.status !== 'completed' && nowSec - lastActive > 1800) {
+      await db.batch([
+        db.prepare("DELETE FROM student_answers WHERE session_id = ?").bind(body.session_id),
+        db.prepare("DELETE FROM exam_sessions WHERE id = ?").bind(body.session_id),
+      ]);
+      return NextResponse.json({ error: 'รอบสอบหมดอายุและถูกลบออกแล้ว เนื่องจากออกจากระบบเกิน 30 นาที' }, { status: 403 });
+    }
     if (session.status !== 'in_progress' || session.progress_revision !== body.revision) return NextResponse.json({ error: 'Session changed', status: session.status }, { status: 409 });
     const questions = JSON.parse(session.question_order ?? '[]') as PoolQuestion[];
     for (const [id, choice] of Object.entries(body.answers)) {

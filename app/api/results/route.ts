@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateId } from "@/lib/utils";
 import { getTeacherSession } from "@/lib/auth-edge";
 import { D1PreparedStatement, getDB } from "@/lib/cloudflare";
+import { cleanupInactiveSessions } from "@/lib/session-cleanup";
 
 interface ResultAnswer {
   question_id: string;
@@ -61,12 +62,24 @@ export async function POST(req: NextRequest) {
     if (actualSessionId) {
       // ตรวจสอบว่า session ยังอยู่หรือไม่
       const existing = await db
-        .prepare("SELECT id, exam_id, started_at, status, score, total_points, progress_revision FROM exam_sessions WHERE id = ?")
+        .prepare("SELECT id, exam_id, started_at, last_active_at, status, score, total_points, progress_revision FROM exam_sessions WHERE id = ?")
         .bind(actualSessionId)
-        .first<{ id: string; exam_id: string; started_at: number; status: string; score: number | null; total_points: number | null; progress_revision: number }>();
+        .first<{ id: string; exam_id: string; started_at: number; last_active_at: number | null; status: string; score: number | null; total_points: number | null; progress_revision: number }>();
 
       if (!existing) {
         return NextResponse.json({ error: "รอบสอบของคุณถูกยกเลิกแล้ว" }, { status: 403 });
+      }
+
+      if (existing.status !== "completed") {
+        const lastActive = existing.last_active_at ?? existing.started_at;
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (nowSec - lastActive > 1800) {
+          await db.batch([
+            db.prepare("DELETE FROM student_answers WHERE session_id = ?").bind(actualSessionId),
+            db.prepare("DELETE FROM exam_sessions WHERE id = ?").bind(actualSessionId),
+          ]);
+          return NextResponse.json({ error: "รอบสอบของคุณหมดอายุและถูกลบออกแล้ว เนื่องจากออกจากระบบเกิน 30 นาที" }, { status: 403 });
+        }
       }
       if (existing.exam_id !== exam_id) {
         return NextResponse.json({ error: "ข้อมูลรอบสอบไม่ตรงกัน" }, { status: 403 });
@@ -252,6 +265,8 @@ export async function GET(req: NextRequest) {
   if (!examId) return NextResponse.json({ error: "Missing exam_id" }, { status: 400 });
 
   try {
+    await cleanupInactiveSessions(db, examId);
+
     const results = await db
       .prepare(`
         SELECT es.*, c.name as classroom_name, c.grade

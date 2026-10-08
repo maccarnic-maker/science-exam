@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/cloudflare";
 import { generateId } from "@/lib/utils";
 import { loadPool, drawQuestions, publicQuestions } from '@/lib/question-pool';
+import { cleanupInactiveSessions } from "@/lib/session-cleanup";
 
 function normalizeStudentName(name: string): string {
   let s = name.trim().replace(/\s+/g, "");
@@ -42,6 +43,8 @@ export async function GET(req: NextRequest) {
     // 1. Check or Create session for student to track live behavior
     let sessionId: string | null = null;
     if (classroomId && studentName && studentNumber) {
+      await cleanupInactiveSessions(db, examId);
+
       const room = await db.prepare('SELECT id FROM classrooms WHERE id = ? AND exam_id = ?').bind(classroomId, examId).first();
       if (!room || !studentName.trim() || studentName.length > 200 || studentNumber.length > 30) return NextResponse.json({ error: 'ข้อมูลนักเรียนหรือห้องเรียนไม่ถูกต้อง' }, { status: 400 });
       const cleanNumber = studentNumber.trim();

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Clock, ChevronLeft, ChevronRight, CheckCircle, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight, CheckCircle, AlertTriangle, ShieldAlert, LogOut } from "lucide-react";
 import toast from "react-hot-toast";
 import CustomModal, { ModalConfig } from "@/components/ui/Modal";
 
@@ -406,6 +406,25 @@ export default function TakeExamPage() {
     });
   };
 
+  const handleExitExam = () => {
+    setModalConfig({
+      isOpen: true,
+      title: "ออกจากห้องสอบชั่วคราว",
+      message:
+        "คุณต้องการออกจากห้องสอบใช่หรือไม่?\n\n• ระบบจะบันทึกคำตอบที่ทำไว้ให้อัตโนมัติ\n• คุณสามารถกลับเข้ามาทำต่อได้ภายใน 30 นาที\n• หากไม่กลับเข้าทำข้อสอบเกิน 30 นาที ระบบจะลบชื่อและรอบสอบของคุณออกทันที",
+      variant: "warning",
+      confirmText: "ออกจากห้องสอบ",
+      cancelText: "ทำข้อสอบต่อ",
+      onConfirm: async () => {
+        try {
+          await saveProgress(false);
+        } catch {}
+        router.push(`/exam/${params.id}`);
+      },
+      onClose: () => setModalConfig((p) => ({ ...p, isOpen: false })),
+    });
+  };
+
   // 3. Timer
   useEffect(() => {
     if (loading || submitted || kicked) return;
@@ -564,11 +583,23 @@ export default function TakeExamPage() {
           </div>
         )}
 
-        {/* Timer */}
-        <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-mono font-bold text-base
-          ${timeLeft < 300 ? "bg-red-50 text-red-600 animate-pulse" : "bg-blue-50 text-blue-700"}`}>
-          <Clock className="w-4 h-4" />
-          <span>{formatTime(timeLeft)}</span>
+        {/* Timer & Exit Button */}
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full font-mono font-bold text-sm sm:text-base
+            ${timeLeft < 300 ? "bg-red-50 text-red-600 animate-pulse" : "bg-blue-50 text-blue-700"}`}>
+            <Clock className="w-4 h-4" />
+            <span>{formatTime(timeLeft)}</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExitExam}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl border border-slate-200 hover:border-red-200 transition-colors"
+            title="ออกจากห้องสอบชั่วคราว (กลับมาทำต่อได้ภายใน 30 นาที)"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">ออกจากห้องสอบ</span>
+          </button>
         </div>
       </header>
 
