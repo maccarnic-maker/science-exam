@@ -84,7 +84,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
     }
   };
 
-  useEffect(() => { loadExam(); loadClassrooms(); }, [id]);
+  useEffect(() => { loadExam(); loadClassrooms(); loadResults(); }, [id]);
   
   // Real-time polling when viewing student behavior and results tab
   useEffect(() => {
