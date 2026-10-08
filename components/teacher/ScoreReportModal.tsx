@@ -48,7 +48,12 @@ export default function ScoreReportModal({
 }: Props) {
   const [selectedClassroom, setSelectedClassroom] = useState<string>("all");
 
-  const filteredResults =
+  const parseStudentNumber = (num: string | number | undefined | null) => {
+    const parsed = parseInt(String(num ?? "").trim(), 10);
+    return isNaN(parsed) ? 999999 : parsed;
+  };
+
+  const rawFilteredResults =
     selectedClassroom === "all"
       ? results
       : results.filter(
@@ -56,6 +61,18 @@ export default function ScoreReportModal({
             r.classroom_id === selectedClassroom ||
             r.classroom_name === selectedClassroom
         );
+
+  const filteredResults = [...rawFilteredResults].sort((a, b) => {
+    // If viewing all classrooms, group by classroom first
+    if (selectedClassroom === "all") {
+      const roomCompare = (a.classroom_name || "").localeCompare(b.classroom_name || "", "th");
+      if (roomCompare !== 0) return roomCompare;
+    }
+    const numA = parseStudentNumber(a.student_number);
+    const numB = parseStudentNumber(b.student_number);
+    if (numA !== numB) return numA - numB;
+    return (a.student_name || "").localeCompare(b.student_name || "", "th");
+  });
 
   // Statistics
   const totalStudents = filteredResults.length;

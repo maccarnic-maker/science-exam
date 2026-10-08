@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import { printDocument } from '@/lib/print-document';
 import { shuffle } from '@/lib/question-pool';
 import { useSearchParams, useParams } from "next/navigation";
@@ -52,6 +52,22 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
   const [showReportModal, setShowReportModal] = useState(false);
 
   const { id } = params;
+
+  const parseStudentNumber = (num: string | number | undefined | null) => {
+    const parsed = parseInt(String(num ?? "").trim(), 10);
+    return isNaN(parsed) ? 999999 : parsed;
+  };
+
+  const sortedResults = useMemo(() => {
+    return [...results].sort((a, b) => {
+      const roomCompare = (a.classroom_name || "").localeCompare(b.classroom_name || "", "th");
+      if (roomCompare !== 0) return roomCompare;
+      const numA = parseStudentNumber(a.student_number);
+      const numB = parseStudentNumber(b.student_number);
+      if (numA !== numB) return numA - numB;
+      return (a.student_name || "").localeCompare(b.student_name || "", "th");
+    });
+  }, [results]);
 
   const loadExam = async () => {
     const [eRes, qRes] = await Promise.all([
@@ -446,7 +462,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {results.map((r, i) => {
+                  {sortedResults.map((r, i) => {
                     const isSubmitted = r.status === "completed" || r.submitted_at !== null;
                     const pct = (r.total_points ?? 0) > 0 ? Math.round(((r.score ?? 0) / r.total_points!) * 100) : 0;
                     const hasCheating = (r.tab_switches ?? 0) > 0;
@@ -543,7 +559,7 @@ function ExamDetailContent({ params }: { params: { id: string } }) {
           timeLimit={exam.time_limit}
           questionCount={exam.draw_count ?? questions.length}
           classrooms={classrooms}
-          results={results}
+          results={sortedResults}
           onClose={() => setShowReportModal(false)}
         />
       )}
