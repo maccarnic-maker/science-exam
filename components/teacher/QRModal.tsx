@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Copy, Download, QrCode, ExternalLink, KeyRound } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import toast from "react-hot-toast";
@@ -17,6 +17,12 @@ interface Props {
 
 export default function QRModal({ examId, examTitle, examToken, classrooms, onClose }: Props) {
   const [selected, setSelected] = useState<Classroom | null>(classrooms[0] ?? null);
+
+  useEffect(() => {
+    if (!selected && classrooms.length > 0) {
+      setSelected(classrooms[0]);
+    }
+  }, [classrooms, selected]);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const shortCode = examToken || examId;
@@ -98,71 +104,77 @@ export default function QRModal({ examId, examTitle, examToken, classrooms, onCl
         )}
 
         {/* Classroom selector */}
-        <div className="px-6 pt-4">
-          <label className="label">เลือกห้องเรียน</label>
-          <div className="flex flex-wrap gap-2">
-            {classrooms.map((cls) => (
-              <button key={cls.id} type="button"
-                onClick={() => setSelected(cls)}
-                className={`px-4 py-2 rounded-xl font-semibold text-sm border-2 transition-all
-                  ${selected?.id === cls.id
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                    : "border-slate-200 text-slate-600 hover:border-indigo-300"}`}>
-                {cls.grade} {cls.name}
-              </button>
-            ))}
+        {classrooms.length > 0 && (
+          <div className="px-6 pt-4">
+            <label className="label">เลือกห้องเรียน</label>
+            <div className="flex flex-wrap gap-2">
+              {classrooms.map((cls) => (
+                <button key={cls.id} type="button"
+                  onClick={() => setSelected(cls)}
+                  className={`px-4 py-2 rounded-xl font-semibold text-sm border-2 transition-all
+                    ${selected?.id === cls.id
+                      ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                      : "border-slate-200 text-slate-600 hover:border-indigo-300"}`}>
+                  {cls.grade} {cls.name}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* QR Code */}
-        {selected && (
-          <div className="px-6 py-4 flex flex-col items-center">
-            <div className="bg-white p-3.5 rounded-2xl shadow-inner border border-slate-200 mb-3">
-              <QRCodeSVG
-                id="qr-svg"
-                value={shortUrl}
-                size={210}
-                level="H"
-                includeMargin
-                imageSettings={{
-                  src: SCHOOL_LOGO_BASE64,
-                  width: 46,
-                  height: 46,
-                  excavate: true,
-                }}
-              />
-            </div>
+        <div className="px-6 py-4 flex flex-col items-center">
+          <div className="bg-white p-3.5 rounded-2xl shadow-inner border border-slate-200 mb-3">
+            <QRCodeSVG
+              id="qr-svg"
+              value={shortUrl}
+              size={210}
+              level="H"
+              includeMargin
+              imageSettings={{
+                src: SCHOOL_LOGO_BASE64,
+                width: 46,
+                height: 46,
+                excavate: true,
+              }}
+            />
+          </div>
+          {selected ? (
             <p className="text-sm font-semibold text-slate-700 mb-0.5">
               ห้อง {selected.grade} {selected.name}
             </p>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 mb-4 text-center max-w-full">
-              <p className="text-xs text-slate-500 font-mono break-all font-semibold select-all">
-                {shortUrl}
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2.5 w-full">
-              <button onClick={copyShortUrl}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl transition-colors text-xs sm:text-sm">
-                <Copy className="w-4 h-4" /> คัดลอกลิงก์
-              </button>
-              <button onClick={downloadQR}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-xs sm:text-sm">
-                <Download className="w-4 h-4" /> ดาวน์โหลด QR
-              </button>
-              <a href={shortUrl} target="_blank" rel="noreferrer"
-                className="flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-700 px-3 py-2.5 rounded-xl transition-colors"
-                title="เปิดลิงก์เข้าสอบ">
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            </div>
-
-            <p className="text-[11px] text-slate-400 mt-3 text-center">
-              💡 นักเรียนสามารถสแกน QR Code หรือเปิดเว็บแล้วกรอกรหัส PIN: <strong>{examToken}</strong> ได้เลย
+          ) : (
+            <p className="text-sm font-semibold text-slate-700 mb-0.5">
+              ลิงก์เข้าสอบ (ให้นักเรียนเลือกห้องสอบเอง)
+            </p>
+          )}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 mb-4 text-center max-w-full">
+            <p className="text-xs text-slate-500 font-mono break-all font-semibold select-all">
+              {shortUrl}
             </p>
           </div>
-        )}
+
+          {/* Actions */}
+          <div className="flex gap-2.5 w-full">
+            <button onClick={copyShortUrl}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl transition-colors text-xs sm:text-sm">
+              <Copy className="w-4 h-4" /> คัดลอกลิงก์
+            </button>
+            <button onClick={downloadQR}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-xs sm:text-sm">
+              <Download className="w-4 h-4" /> ดาวน์โหลด QR
+            </button>
+            <a href={shortUrl} target="_blank" rel="noreferrer"
+              className="flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-700 px-3 py-2.5 rounded-xl transition-colors"
+              title="เปิดลิงก์เข้าสอบ">
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+
+          <p className="text-[11px] text-slate-400 mt-3 text-center">
+            💡 นักเรียนสามารถสแกน QR Code หรือเปิดเว็บแล้วกรอกรหัส PIN: <strong>{examToken}</strong> ได้เลย
+          </p>
+        </div>
       </div>
     </div>
   );

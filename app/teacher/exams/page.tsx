@@ -5,6 +5,13 @@ import { BookOpen, PlusCircle, QrCode, Settings, Trash2, ToggleLeft, ToggleRight
 import toast from "react-hot-toast";
 
 import CustomModal, { ModalConfig } from "@/components/ui/Modal";
+import QRModal from "@/components/teacher/QRModal";
+
+interface Classroom {
+  id: string;
+  name: string;
+  grade: string;
+}
 
 interface Exam {
   id: string;
@@ -27,6 +34,21 @@ export default function ExamsListPage() {
   const grades = Array.from(new Set(exams.flatMap(examGrades))).sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
   const filteredExams = exams.filter(exam => !selectedGrade || (selectedGrade === '__unassigned' ? examGrades(exam).length === 0 : examGrades(exam).includes(selectedGrade)));
   const [modalConfig, setModalConfig] = useState<ModalConfig>({ isOpen: false, title: "", message: "" });
+  const [qrExam, setQrExam] = useState<Exam | null>(null);
+  const [qrClassrooms, setQrClassrooms] = useState<Classroom[]>([]);
+
+  const handleOpenQR = async (exam: Exam) => {
+    setQrExam(exam);
+    setQrClassrooms([]);
+    try {
+      const res = await fetch(`/api/classrooms?exam_id=${exam.id}`);
+      if (res.ok) {
+        setQrClassrooms(await res.json());
+      }
+    } catch {
+      setQrClassrooms([]);
+    }
+  };
 
   const load = () => {
     fetch("/api/exams")
@@ -134,13 +156,22 @@ export default function ExamsListPage() {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* QR Code */}
-                <Link href={`/teacher/exams/${exam.id}?tab=qr`}
-                  className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                <button
+                  type="button"
+                  onClick={() => handleOpenQR(exam)}
+                  className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                  title="เปิด QR Code และลิงก์เข้าสอบ"
+                >
                   <QrCode className="w-4 h-4" /> QR / ลิงค์
-                </Link>
+                </button>
                 {/* Manage */}
-                <Link href={`/teacher/exams/${exam.id}`}
-                  className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                <Link
+                  href={`/teacher/exams/${exam.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                  title="เปิดหน้าจัดการข้อสอบในแท็บใหม่"
+                >
                   <Settings className="w-4 h-4" /> จัดการ
                 </Link>
                 {/* Toggle */}
@@ -164,6 +195,20 @@ export default function ExamsListPage() {
 
       {/* Confirmation Modal */}
       <CustomModal {...modalConfig} />
+
+      {/* QR Modal */}
+      {qrExam && (
+        <QRModal
+          examId={qrExam.id}
+          examTitle={qrExam.title}
+          examToken={qrExam.token}
+          classrooms={qrClassrooms}
+          onClose={() => {
+            setQrExam(null);
+            setQrClassrooms([]);
+          }}
+        />
+      )}
     </div>
   );
 }
